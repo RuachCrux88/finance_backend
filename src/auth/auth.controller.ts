@@ -1,68 +1,50 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { Response } from 'express';
-import { PrismaService } from '../prisma/prisma.service';
+// src/auth/auth.controller.ts
+import { Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
+import type { Request, Response } from 'express';
+import { AuthGuard } from '@nestjs/passport';
+import { AuthService } from './auth.service';
 
-@Injectable()
-export class AuthService {
-  constructor(
-    private prisma: PrismaService,
-    private jwt: JwtService,
-  ) {}
+@Controller('auth')
+export class AuthController {
+  constructor(private readonly auth: AuthService) {}
 
-  async validateOAuthLogin(profile: {
-    provider: 'google';
-    providerId: string;
-    email?: string;
-    name?: string;
-    avatar?: string;
-  }) {
-    if (!profile.email)
-      throw new UnauthorizedException('Google no entregó email.');
-
-    // Usuario (upsert por email)
-    const user = await this.prisma.user.upsert({
-      where: { email: profile.email },
-      update: { name: profile.name ?? undefined },
-      create: { email: profile.email, name: profile.name ?? null },
-    });
-
-    // (opcional) Registrar cuenta de proveedor en tabla Account
-    await this.prisma.account.upsert({
-      where: {
-        provider_providerAccountId: {
-          provider: 'google',
-          providerAccountId: profile.providerId,
-        },
-      },
-      update: { userId: user.id },
-      create: {
-        userId: user.id,
-        type: 'oauth',
-        provider: 'google',
-        providerAccountId: profile.providerId,
-      },
-    });
-
-    const token = await this.jwt.signAsync({ sub: user.id, email: user.email });
-    return { token, user };
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
+  google() {
+    // Passport redirige a Google. Nada que hacer aquí.
   }
 
-  setAuthCookie(res: Response, token: string) {
-    const secure = process.env.NODE_ENV === 'production';
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  async googleCallback(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    // req.user viene del GoogleStrategy
+    const token = await this.auth.loginGoogle(req.user as any);
+
+    // Seteamos cookie httpOnly con el JWT
     res.cookie('token', token, {
       httpOnly: true,
       sameSite: 'lax',
-      secure,
-      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 días
+      secure: false, // en prod: true + HTTPS
       path: '/',
+      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 días
     });
+
+    res.redirect(process.env.FRONTEND_URL ?? 'http://localhost:3000');
   }
 
-  clearAuthCookie(res: Response) {
+  @Get('me')
+  @UseGuards(AuthGuard('jwt'))
+  me(@Req() req: Request) {
+    // payload validado por JwtStrategy
+    return req.user;
+  }
+
+  @Post('logout')
+  logout(@Res({ passthrough: true }) res: Response) {
     res.clearCookie('token', { path: '/' });
+    return { ok: true };
   }
-}
-
-export class AuthController {
 }

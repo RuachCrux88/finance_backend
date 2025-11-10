@@ -1,61 +1,34 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+// src/auth/auth.service.ts
+import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { Response } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class AuthService {
-  constructor(private prisma: PrismaService, private jwt: JwtService) {}
+  constructor(private jwt: JwtService, private prisma: PrismaService) {}
 
-  async validateOAuthLogin(profile: {
-    provider: 'google';
-    providerId: string;
-    email?: string;
-    name?: string;
-    avatar?: string;
-  }) {
-    if (!profile.email) throw new UnauthorizedException('Google no entregó email.');
+  async loginGoogle(userFromStrategy: { email: string; name?: string }) {
+    if (!userFromStrategy?.email) throw new Error('Google sin email');
 
-    // Usuario (upsert por email)
-    const user = await this.prisma.user.upsert({
-      where: { email: profile.email },
-      update: { name: profile.name ?? undefined },
-      create: { email: profile.email, name: profile.name ?? null },
+    let user = await this.prisma.user.findUnique({
+      where: { email: userFromStrategy.email },
     });
 
-    // (opcional) Registrar cuenta de proveedor en tabla Account
-    await this.prisma.account.upsert({
-      where: {
-        provider_providerAccountId: {
-          provider: 'google',
-          providerAccountId: profile.providerId,
+    if (!user) {
+      user = await this.prisma.user.create({
+        data: {
+          email: userFromStrategy.email,
+          name: userFromStrategy.name ?? '',
         },
-      },
-      update: { userId: user.id },
-      create: {
-        userId: user.id,
-        type: 'oauth',
-        provider: 'google',
-        providerAccountId: profile.providerId,
-      },
+      });
+    }
+
+    const payload = { sub: user.id, email: user.email };
+    const token = await this.jwt.signAsync(payload, {
+      secret: process.env.JWT_SECRET ?? 'dev-secret',
+      expiresIn: '7d',
     });
 
-    const token = await this.jwt.signAsync({ sub: user.id, email: user.email });
-    return { token, user };
-  }
-
-  setAuthCookie(res: Response, token: string) {
-    const secure = process.env.NODE_ENV === 'production';
-    res.cookie('token', token, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure,
-      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 días
-      path: '/',
-    });
-  }
-
-  clearAuthCookie(res: Response) {
-    res.clearCookie('token', { path: '/' });
+    return token;
   }
 }
