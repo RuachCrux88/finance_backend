@@ -1,0 +1,253 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum WalletType {
+  PERSONAL
+  GROUP
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+  SETTLEMENT
+}
+
+enum Role {
+  OWNER
+  MEMBER
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
+enum GoalStatus {
+  ACTIVE
+  PAUSED
+  ACHIEVED
+  CANCELLED
+}
+
+enum CategoryType {
+  INCOME
+  EXPENSE
+}
+
+model Account {
+  id                String  @id @default(uuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model User {
+  id              String    @id @default(uuid())
+  name            String?
+  email           String    @unique
+  password        String?
+  createdAt       DateTime  @default(now())
+  emailVerifiedAt DateTime?
+  googleId        String?   @unique
+
+  // relaciones NextAuth
+  accounts Account[]
+  sessions Session[]
+
+  // Relaciones
+  walletsOwned        Wallet[]       @relation("WalletOwner")
+  walletMemberships   WalletMember[]
+  transactionsPaid    Transaction[]  @relation("PaidBy")
+  transactionsCreated Transaction[]  @relation("TransactionsCreatedBy")
+  goalsCreated        Goal[]         @relation("GoalsCreatedBy")
+  goalProgressCreated GoalProgress[] @relation("GoalProgressCreatedBy")
+  invitationsSent     Invitation[]   @relation("InvitationInvitedBy")
+  categoriesCreated   Category[]     @relation("CategoryCreatedBy")
+  settlementsFrom     Settlement[]   @relation("SettlementFrom")
+  settlementsTo       Settlement[]   @relation("SettlementTo")
+  settlementsCreated  Settlement[]   @relation("SettlementCreatedBy")
+
+  TransactionSplit TransactionSplit[] @relation("SplitsOwedBy")
+
+  Goal Goal[] @relation("GoalsUser")
+}
+
+model Wallet {
+  id          String     @id @default(uuid())
+  name        String
+  type        WalletType @default(PERSONAL)
+  currency    String     @default("COP")
+  createdById String
+  createdBy   User       @relation("WalletOwner", fields: [createdById], references: [id])
+  createdAt   DateTime   @default(now())
+
+  members      WalletMember[]
+  transactions Transaction[]
+  invitations  Invitation[]
+  goals        Goal[]
+  settlements  Settlement[]
+}
+
+model WalletMember {
+  id       String   @id @default(uuid())
+  walletId String
+  userId   String
+  role     Role     @default(MEMBER)
+  joinedAt DateTime @default(now())
+
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([walletId, userId])
+}
+
+model Category {
+  id          String       @id @default(uuid())
+  name        String
+  type        CategoryType
+  description String?
+  isSystem    Boolean      @default(true)
+
+  createdById String?
+  createdBy   User?   @relation("CategoryCreatedBy", fields: [createdById], references: [id])
+
+  // relación con transacciones si la tienes
+  transactions Transaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([name, type]) // para upsert compuesto: where: { name_type: { name, type } }
+}
+
+model Transaction {
+  id           String          @id @default(uuid())
+  walletId     String
+  categoryId   String
+  type         TransactionType
+  amount       Decimal         @db.Decimal(14, 2)
+  date         DateTime        @default(now())
+  description  String?
+  paidByUserId String
+  createdById  String
+  createdAt    DateTime        @default(now())
+
+  wallet    Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  category  Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  paidBy    User     @relation("PaidBy", fields: [paidByUserId], references: [id])
+  createdBy User     @relation("TransactionsCreatedBy", fields: [createdById], references: [id])
+
+  splits TransactionSplit[]
+}
+
+model TransactionSplit {
+  id            String  @id @default(uuid())
+  transactionId String
+  owedByUserId  String
+  amount        Decimal @db.Decimal(14, 2)
+  settled       Boolean @default(false)
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  owedBy      User        @relation("SplitsOwedBy", fields: [owedByUserId], references: [id])
+
+  @@unique([transactionId, owedByUserId])
+}
+
+model Settlement {
+  id          String   @id @default(uuid())
+  walletId    String
+  fromUserId  String
+  toUserId    String
+  amount      Decimal  @db.Decimal(14, 2)
+  date        DateTime @default(now())
+  createdById String
+
+  wallet    Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  fromUser  User   @relation("SettlementFrom", fields: [fromUserId], references: [id])
+  toUser    User   @relation("SettlementTo", fields: [toUserId], references: [id])
+  createdBy User   @relation("SettlementCreatedBy", fields: [createdById], references: [id])
+}
+
+model Goal {
+  id            String     @id @default(uuid())
+  scope         String // "USER" o "WALLET" (lo valida la app)
+  userId        String?
+  walletId      String?
+  name          String
+  targetAmount  Decimal    @db.Decimal(14, 2)
+  currentAmount Decimal    @default(0) @db.Decimal(14, 2)
+  deadline      DateTime?
+  status        GoalStatus @default(ACTIVE)
+  createdById   String
+  createdAt     DateTime   @default(now())
+
+  user      User?   @relation("GoalsUser", fields: [userId], references: [id])
+  wallet    Wallet? @relation(fields: [walletId], references: [id])
+  createdBy User    @relation("GoalsCreatedBy", fields: [createdById], references: [id])
+
+  progress GoalProgress[]
+}
+
+model GoalProgress {
+  id          String   @id @default(uuid())
+  goalId      String
+  amount      Decimal  @db.Decimal(14, 2)
+  note        String?
+  date        DateTime @default(now())
+  createdById String
+
+  goal      Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  createdBy User @relation("GoalProgressCreatedBy", fields: [createdById], references: [id])
+}
+
+model Invitation {
+  id              String       @id @default(uuid())
+  walletId        String
+  email           String
+  status          InviteStatus @default(PENDING)
+  token           String       @unique
+  invitedByUserId String
+  expiresAt       DateTime
+  createdAt       DateTime     @default(now())
+
+  wallet    Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  invitedBy User   @relation("InvitationInvitedBy", fields: [invitedByUserId], references: [id])
+}
