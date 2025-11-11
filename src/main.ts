@@ -6,9 +6,9 @@ import { ValidationPipe } from '@nestjs/common';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import * as express from 'express';
 
-let cachedApp: any;
+let cachedApp: express.Express;
 
-async function createApp() {
+async function createApp(): Promise<express.Express> {
   if (cachedApp) {
     return cachedApp;
   }
@@ -53,14 +53,20 @@ async function createApp() {
   return expressApp;
 }
 
-// Para Vercel: exportar el handler
-if (process.env.VERCEL || process.env.VERCEL_ENV) {
-  module.exports = async (req: express.Request, res: express.Response) => {
-    const app = await createApp();
-    return app(req, res);
-  };
-} else {
-  // Para desarrollo local
+// Exportar handler para Vercel (siempre exportar, Vercel lo detectará)
+export default async function handler(req: express.Request, res: express.Response) {
+  const app = await createApp();
+  return app(req, res);
+}
+
+// También exportar como module.exports para compatibilidad con CommonJS
+module.exports = async (req: express.Request, res: express.Response) => {
+  const app = await createApp();
+  return app(req, res);
+};
+
+// Para desarrollo local (solo si no está en Vercel)
+if (!process.env.VERCEL && !process.env.VERCEL_ENV) {
   createApp().then((expressApp) => {
     const port = Number(process.env.PORT) || 4000;
     expressApp.listen(port, () => {
