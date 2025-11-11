@@ -39,11 +39,11 @@ export class AuthController {
         domain: process.env.NODE_ENV === 'production' ? undefined : undefined, // Dejar que el navegador maneje el dominio
       });
 
-      const frontendUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'https://financefrontend-pink.vercel.app' || 'http://localhost:3000';
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
       res.redirect(frontendUrl);
     } catch (error: any) {
       // Redirigir al frontend con un error
-      const frontendUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'https://financefrontend-pink.vercel.app' || 'http://localhost:3000';
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
       const errorMessage = encodeURIComponent(
         error.message || 'Authentication failed',
       );
