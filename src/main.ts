@@ -3,13 +3,39 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import cookieParser from 'cookie-parser';
 import { ValidationPipe } from '@nestjs/common';
+import { ExpressAdapter } from '@nestjs/platform-express';
+import * as express from 'express';
 
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+let cachedApp: any;
+
+async function createApp() {
+  if (cachedApp) {
+    return cachedApp;
+  }
+
+  const expressApp = express();
+  const app = await NestFactory.create(AppModule, new ExpressAdapter(expressApp));
 
   app.use(cookieParser());
+  
+  // Configurar CORS con múltiples orígenes permitidos
+  const allowedOrigins = [
+    process.env.FRONTEND_URL,
+    process.env.NEXT_PUBLIC_API_BASE_URL,
+    'https://financefrontend-pink.vercel.app',
+    'http://localhost:3000',
+  ].filter(Boolean);
+
   app.enableCors({
-    origin: process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000',
+    origin: (origin, callback) => {
+      // Permitir requests sin origin (mobile apps, Postman, etc.)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(null, true); // Permitir todos en desarrollo, ajustar en producción
+      }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -22,8 +48,23 @@ async function bootstrap() {
     forbidNonWhitelisted: true,
   }));
 
-  const port = Number(process.env.PORT) || 4000;
-  await app.listen(port);
-  // Opcional: console.log(`API up on ${await app.getUrl()}`);
+  await app.init();
+  cachedApp = expressApp;
+  return expressApp;
 }
-bootstrap();
+
+// Para Vercel: exportar el handler
+if (process.env.VERCEL || process.env.VERCEL_ENV) {
+  module.exports = async (req: express.Request, res: express.Response) => {
+    const app = await createApp();
+    return app(req, res);
+  };
+} else {
+  // Para desarrollo local
+  createApp().then((expressApp) => {
+    const port = Number(process.env.PORT) || 4000;
+    expressApp.listen(port, () => {
+      console.log(`API up on http://localhost:${port}`);
+    });
+  });
+}

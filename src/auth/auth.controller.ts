@@ -23,9 +23,8 @@ export class AuthController {
     try {
       // req.user viene del GoogleStrategy
       if (!req.user) {
-        return res.redirect(
-          `${process.env.FRONTEND_URL ?? 'http://localhost:3000'}/login?error=no_user`,
-        );
+        const frontendUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'https://financefrontend-pink.vercel.app' || 'http://localhost:3000';
+        return res.redirect(`${frontendUrl}/login?error=no_user`);
       }
 
       const token = await this.auth.loginGoogle(req.user as any);
@@ -34,15 +33,17 @@ export class AuthController {
       res.cookie('token', token, {
         httpOnly: true,
         sameSite: 'lax',
-        secure: false, // en prod: true + HTTPS
+        secure: process.env.NODE_ENV === 'production', // true en producción con HTTPS
         path: '/',
         maxAge: 1000 * 60 * 60 * 24 * 7, // 7 días
+        domain: process.env.NODE_ENV === 'production' ? undefined : undefined, // Dejar que el navegador maneje el dominio
       });
 
-      res.redirect(process.env.FRONTEND_URL ?? 'http://localhost:3000');
+      const frontendUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'https://financefrontend-pink.vercel.app' || 'http://localhost:3000';
+      res.redirect(frontendUrl);
     } catch (error: any) {
       // Redirigir al frontend con un error
-      const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
+      const frontendUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'https://financefrontend-pink.vercel.app' || 'http://localhost:3000';
       const errorMessage = encodeURIComponent(
         error.message || 'Authentication failed',
       );
