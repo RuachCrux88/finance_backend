@@ -18,28 +18,13 @@ async function createApp(): Promise<express.Express> {
 
   app.use(cookieParser());
   
-  // Configurar CORS con múltiples orígenes permitidos
-  const allowedOrigins = [
-    process.env.FRONTEND_URL,
-    process.env.NEXT_PUBLIC_API_BASE_URL,
-    'https://financefrontend-pink.vercel.app',
-    'http://localhost:3000',
-  ].filter(Boolean);
-
+  // Configurar CORS - permitir todos los orígenes para evitar problemas de conexión
   app.enableCors({
-    origin: (origin, callback) => {
-      // Permitir requests sin origin (mobile apps, Postman, etc.)
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        // En producción, podrías ser más estricto aquí
-        callback(null, true);
-      }
-    },
+    origin: true, // Permitir todos los orígenes (Vercel maneja esto automáticamente)
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+    exposedHeaders: ['Set-Cookie'],
   });
 
   // Agregar validación global
@@ -56,7 +41,16 @@ async function createApp(): Promise<express.Express> {
 
 // Exportar handler para Vercel - debe ser export default
 export default async function handler(req: express.Request, res: express.Response) {
-  const app = await createApp();
-  return app(req, res);
+  try {
+    const app = await createApp();
+    return app(req, res);
+  } catch (error) {
+    console.error('Error en handler de Vercel:', error);
+    res.status(500).json({ 
+      error: 'Internal Server Error',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString(),
+    });
+  }
 }
 
