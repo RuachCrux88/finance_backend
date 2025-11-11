@@ -584,7 +584,7 @@ export class WalletsService {
         // Split parcial - crear nuevo split con el resto
         await this.prisma.transactionSplit.update({
           where: { id: split.id },
-          data: { amount: new Prisma.Decimal(remainingAmount), settled: true },
+          data: { amount: new Decimal(remainingAmount), settled: true },
         });
         await this.prisma.transactionSplit.create({
           data: {
