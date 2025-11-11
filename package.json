@@ -1,6 +1,7 @@
 {
   "scripts": {
     "build": "nest build",
+    "vercel-build": "npm run build && npx prisma generate",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",

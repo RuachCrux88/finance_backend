@@ -14,65 +14,71 @@ export class TransactionsService {
 
   // ✅ NUEVA FIRMA: recibe userId para setear createdBy
   async create(userId: string, dto: CreateTransactionDto) {
-    // Verificar que el usuario pertenezca a la billetera
-    const wallet = await this.prisma.wallet.findFirst({
-      where: {
-        id: dto.walletId,
-        OR: [{ createdById: userId }, { members: { some: { userId } } }],
-      },
-      include: { members: true },
-    });
+    try {
+      // Verificar que el usuario pertenezca a la billetera
+      const wallet = await this.prisma.wallet.findFirst({
+        where: {
+          id: dto.walletId,
+          OR: [{ createdById: userId }, { members: { some: { userId } } }],
+        },
+        include: { members: true },
+      });
 
-    if (!wallet) {
-      throw new ForbiddenException('No perteneces a esta billetera');
-    }
+      if (!wallet) {
+        throw new ForbiddenException('No perteneces a esta billetera');
+      }
 
-    // En billeteras grupales, solo permitir transacciones de tipo INCOME (aportes)
-    if (wallet.type === 'GROUP' && dto.type !== 'INCOME') {
-      throw new BadRequestException('En billeteras grupales solo se permiten aportes (INCOME)');
-    }
+      // En billeteras grupales, solo permitir transacciones de tipo INCOME (aportes)
+      if (wallet.type === 'GROUP' && dto.type !== 'INCOME') {
+        throw new BadRequestException('En billeteras grupales solo se permiten aportes (INCOME)');
+      }
 
-    const transaction = await this.prisma.transaction.create({
-      data: {
+      // Preparar los datos de la transacción
+      const transactionData: Prisma.TransactionCreateInput = {
         wallet: { connect: { id: dto.walletId } },
-        category: { connect: { id: dto.categoryId } },
         type: dto.type,
         amount: new Prisma.Decimal(dto.amount),
         description: dto.description ?? null,
         paidBy: { connect: { id: dto.paidByUserId } },
         createdBy: { connect: { id: userId } }, // ✅ requerido por tu modelo
+      };
 
-        // splits opcionales
-        ...(dto.splits?.length
-          ? {
-              splits: {
-                create: dto.splits.map((s) => ({
-                  owedBy: { connect: { id: s.owedByUserId } },
-                  amount: new Prisma.Decimal(s.amount),
-                })),
-              },
-            }
-          : {}),
-      },
-      include: {
-        splits: {
-          include: { owedBy: { select: { id: true, name: true, email: true } } },
-        },
-        category: {
-          select: {
-            id: true,
-            name: true,
-            type: true,
-            description: true,
-            isSystem: true,
+      // Solo conectar categoría si se proporciona
+      if (dto.categoryId) {
+        transactionData.category = { connect: { id: dto.categoryId } };
+      }
+
+      // splits opcionales
+      if (dto.splits?.length) {
+        transactionData.splits = {
+          create: dto.splits.map((s) => ({
+            owedBy: { connect: { id: s.owedByUserId } },
+            amount: new Prisma.Decimal(s.amount),
+          })),
+        };
+      }
+
+      const transaction = await this.prisma.transaction.create({
+        data: transactionData,
+        include: {
+          splits: {
+            include: { owedBy: { select: { id: true, name: true, email: true } } },
           },
+          category: {
+            select: {
+              id: true,
+              name: true,
+              type: true,
+              description: true,
+              isSystem: true,
+            },
+          },
+          paidBy: { select: { id: true, name: true, email: true } },
+          createdBy: { select: { id: true, name: true, email: true } },
         },
-        paidBy: { select: { id: true, name: true, email: true } },
-        createdBy: { select: { id: true, name: true, email: true } },
-      },
-    });
+      });
 
-    // Si es un aporte en billetera grupal (INCOME), actualizar el progreso de las metas activas
+      // Si es un aporte en billetera grupal (INCOME), actualizar el progreso de las metas activas
     if (wallet.type === 'GROUP' && dto.type === 'INCOME') {
       const activeGoals = await this.prisma.goal.findMany({
         where: {
@@ -129,9 +135,17 @@ export class TransactionsService {
           console.warn(`Meta "${goalName}" no encontrada para el usuario ${userId}`);
         }
       }
-    }
 
-    return transaction;
+      return transaction;
+    } catch (error) {
+      console.error('Error al crear transacción:', error);
+      if (error instanceof ForbiddenException || error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException(
+        error instanceof Error ? error.message : 'Error al crear la transacción'
+      );
+    }
   }
 
   // ✅ LISTAR TRANSACCIONES DE UNA BILLETERA (con verificación de pertenencia)
@@ -171,7 +185,13 @@ export class TransactionsService {
   // (si ya tienes update, no hace falta tocarlo para estos errores)
   async update(id: string, dto: UpdateTransactionDto) {
     const data: Prisma.TransactionUpdateInput = {};
-    if (dto.categoryId) data.category = { connect: { id: dto.categoryId } };
+    if (dto.categoryId !== undefined) {
+      if (dto.categoryId === null) {
+        data.category = { disconnect: true };
+      } else {
+        data.category = { connect: { id: dto.categoryId } };
+      }
+    }
     if (dto.type) data.type = dto.type;
     if (dto.amount !== undefined) data.amount = new Prisma.Decimal(dto.amount);
     if (dto.description !== undefined) data.description = dto.description;

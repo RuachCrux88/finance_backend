@@ -1,4 +1,4 @@
-import { IsUUID, IsEnum, IsNumber, Min, IsOptional, IsString, IsArray, ValidateNested } from 'class-validator';
+import { IsUUID, IsEnum, IsNumber, Min, IsOptional, IsString, IsArray, ValidateNested, ValidateIf } from 'class-validator';
 import { Type } from 'class-transformer';
 import { TransactionType } from '@prisma/client';
 import { CreateSplitDto } from './create-split.dto';
@@ -7,8 +7,10 @@ export class CreateTransactionDto {
   @IsUUID()
   walletId!: string;
 
+  @IsOptional()
+  @ValidateIf((o) => o.categoryId !== undefined && o.categoryId !== null)
   @IsUUID()
-  categoryId!: string;
+  categoryId?: string;
 
   @IsEnum(TransactionType)
   type!: TransactionType;

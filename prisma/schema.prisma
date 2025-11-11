@@ -117,7 +117,7 @@ model Category {
 model Transaction {
   id           String             @id @default(uuid())
   walletId     String
-  categoryId   String
+  categoryId   String?
   type         TransactionType
   amount       Decimal            @db.Decimal(14, 2)
   date         DateTime           @default(now())
@@ -125,7 +125,7 @@ model Transaction {
   paidByUserId String
   createdById  String
   createdAt    DateTime           @default(now())
-  category     Category           @relation(fields: [categoryId], references: [id])
+  category     Category?          @relation(fields: [categoryId], references: [id])
   createdBy    User               @relation("TransactionsCreatedBy", fields: [createdById], references: [id])
   paidBy       User               @relation("PaidBy", fields: [paidByUserId], references: [id])
   wallet       Wallet             @relation(fields: [walletId], references: [id], onDelete: Cascade)
