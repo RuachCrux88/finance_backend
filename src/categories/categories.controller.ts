@@ -11,8 +11,13 @@ export class CategoriesController {
   constructor(private readonly svc: CategoriesService) {}
 
   @Get()
-  list(@Req() req, @Query('type') type?: CategoryType) {
-    return this.svc.list(req.user.id, type);
+  async list(@Req() req, @Query('type') type?: CategoryType, @Query('walletId') walletId?: string) {
+    try {
+      return await this.svc.list(req.user.id, type, walletId);
+    } catch (error: any) {
+      console.error('Error listing categories:', error);
+      throw error;
+    }
   }
 
   @Post()

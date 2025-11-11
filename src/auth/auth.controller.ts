@@ -20,26 +20,44 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    // req.user viene del GoogleStrategy
-    const token = await this.auth.loginGoogle(req.user as any);
+    try {
+      // req.user viene del GoogleStrategy
+      if (!req.user) {
+        return res.redirect(
+          `${process.env.FRONTEND_URL ?? 'http://localhost:3000'}/login?error=no_user`,
+        );
+      }
 
-    // Seteamos cookie httpOnly con el JWT
-    res.cookie('token', token, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: false, // en prod: true + HTTPS
-      path: '/',
-      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 días
-    });
+      const token = await this.auth.loginGoogle(req.user as any);
 
-    res.redirect(process.env.FRONTEND_URL ?? 'http://localhost:3000');
+      // Seteamos cookie httpOnly con el JWT
+      res.cookie('token', token, {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: false, // en prod: true + HTTPS
+        path: '/',
+        maxAge: 1000 * 60 * 60 * 24 * 7, // 7 días
+      });
+
+      res.redirect(process.env.FRONTEND_URL ?? 'http://localhost:3000');
+    } catch (error: any) {
+      // Redirigir al frontend con un error
+      const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
+      const errorMessage = encodeURIComponent(
+        error.message || 'Authentication failed',
+      );
+      res.redirect(`${frontendUrl}/login?error=${errorMessage}`);
+    }
   }
 
   @Get('me')
   @UseGuards(AuthGuard('jwt'))
-  me(@Req() req: Request) {
+  async me(@Req() req: Request) {
     // payload validado por JwtStrategy
-    return req.user;
+    const userInfo = req.user as { id: string; email: string };
+    // Obtenemos el usuario completo de la base de datos para incluir el nombre
+    const fullUser = await this.auth.getUserById(userInfo.id);
+    return fullUser || userInfo;
   }
 
   @Post('logout')

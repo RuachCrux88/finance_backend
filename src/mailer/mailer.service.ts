@@ -27,4 +27,23 @@ export class MailerService {
     });
     this.logger.log(`Email de verificación enviado a ${to} (id: ${info.messageId})`);
   }
+
+  async sendInvitationEmail(to: string, walletName: string, ownerName: string, acceptUrl: string) {
+    const from = process.env.MAIL_FROM ?? 'no-reply@finance.local';
+    const info = await this.transporter.sendMail({
+      from,
+      to,
+      subject: `Invitación a la billetera "${walletName}"`,
+      html: `
+        <h2>Invitación a billetera grupal</h2>
+        <p><strong>${ownerName}</strong> te ha invitado a unirte a la billetera grupal <strong>"${walletName}"</strong>.</p>
+        <p>Haz clic en el botón para aceptar la invitación:</p>
+        <p><a href="${acceptUrl}" style="padding:10px 16px;background:#7c3aed;color:#fff;border-radius:8px;text-decoration:none">Aceptar invitación</a></p>
+        <p>Si no funciona, copia y pega esta URL en tu navegador:</p>
+        <code>${acceptUrl}</code>
+        <p><small>Esta invitación expira en 7 días.</small></p>
+      `,
+    });
+    this.logger.log(`Email de invitación enviado a ${to} (id: ${info.messageId})`);
+  }
 }

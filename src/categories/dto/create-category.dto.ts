@@ -1,4 +1,4 @@
-import { IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 import { CategoryType } from '@prisma/client';
 
 export class CreateCategoryDto {
@@ -10,4 +10,7 @@ export class CreateCategoryDto {
 
   @IsOptional() @IsString() @MaxLength(140)
   description?: string;
+
+  @IsOptional() @IsUUID()
+  walletId?: string;
 }

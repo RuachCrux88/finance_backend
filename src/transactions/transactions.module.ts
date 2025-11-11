@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
 import { TransactionsService } from './transactions.service';
 import { TransactionsController } from './transactions.controller';
-import { PrismaModule } from '../prisma/prisma.module'; // si no es global
+import { PrismaModule } from '../prisma/prisma.module';
+import { GoalsModule } from '../goals/goals.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, GoalsModule],
   controllers: [TransactionsController],
   providers: [TransactionsService],
 })
