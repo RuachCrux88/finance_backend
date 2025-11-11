@@ -34,4 +34,9 @@ export class CategoriesController {
   remove(@Req() req, @Param('id') id: string) {
     return this.svc.remove(req.user.id, id);
   }
+
+  @Post('cleanup-duplicates')
+  async cleanupDuplicates(@Req() req) {
+    return this.svc.cleanupDuplicates(req.user.id);
+  }
 }

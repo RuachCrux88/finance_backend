@@ -8,5 +8,6 @@ import { GoalsModule } from '../goals/goals.module';
   imports: [PrismaModule, GoalsModule],
   controllers: [TransactionsController],
   providers: [TransactionsService],
+  exports: [TransactionsService],
 })
 export class TransactionsModule {}

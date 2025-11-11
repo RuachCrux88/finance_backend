@@ -65,6 +65,7 @@ model User {
   TransactionSplit    TransactionSplit[] @relation("SplitsOwedBy")
   walletsOwned        Wallet[]           @relation("WalletOwner")
   walletMemberships   WalletMember[]
+  paymentReminders    PaymentReminder[]
 }
 
 model Wallet {
@@ -83,6 +84,7 @@ model Wallet {
   categories   Category[]     @relation("WalletCategories")
   createdBy    User           @relation("WalletOwner", fields: [createdById], references: [id])
   members      WalletMember[]
+  paymentReminders PaymentReminder[]
 }
 
 model WalletMember {
@@ -110,6 +112,7 @@ model Category {
   createdBy    User?         @relation("CategoryCreatedBy", fields: [createdById], references: [id])
   wallet       Wallet?       @relation("WalletCategories", fields: [walletId], references: [id])
   transactions Transaction[]
+  paymentReminders PaymentReminder[]
 
   @@unique([name, type, walletId])
 }
@@ -130,6 +133,7 @@ model Transaction {
   paidBy       User               @relation("PaidBy", fields: [paidByUserId], references: [id])
   wallet       Wallet             @relation(fields: [walletId], references: [id], onDelete: Cascade)
   splits       TransactionSplit[]
+  paymentReminder PaymentReminder?
 }
 
 model TransactionSplit {
@@ -198,6 +202,27 @@ model Invitation {
   createdAt       DateTime     @default(now())
   invitedBy       User         @relation("InvitationInvitedBy", fields: [invitedByUserId], references: [id])
   wallet          Wallet       @relation(fields: [walletId], references: [id], onDelete: Cascade)
+}
+
+model PaymentReminder {
+  id            String      @id @default(uuid())
+  userId        String
+  walletId      String
+  categoryId    String       // Categoría de gasto obligatoria
+  name          String
+  amount        Decimal     @db.Decimal(14, 2)
+  description   String?
+  dueDate       DateTime
+  reminderDate  DateTime?   // Cuándo notificar (opcional)
+  isPaid        Boolean     @default(false)
+  paidAt        DateTime?
+  transactionId String?      @unique // Si se creó una transacción
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallet        Wallet      @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  category      Category    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  transaction   Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
 }
 
 enum WalletType {

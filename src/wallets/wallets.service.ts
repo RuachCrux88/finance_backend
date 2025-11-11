@@ -79,17 +79,41 @@ export class WalletsService {
       );
     }
 
-    // Crear categorías predeterminadas
+    // Crear categorías predeterminadas solo si no existen globales
     for (const cat of defaultCategories) {
-      await this.prisma.category.create({
-        data: {
+      // Verificar si ya existe una categoría global con el mismo nombre y tipo
+      const existingGlobal = await this.prisma.category.findFirst({
+        where: {
           name: cat.name,
           type: cat.type,
-          description: cat.description,
-          isSystem: true,
-          wallet: { connect: { id: wallet.id } },
+          walletId: null, // Categoría global
         },
       });
+
+      // Solo crear si no existe una categoría global
+      if (!existingGlobal) {
+        // Verificar si ya existe en esta billetera
+        const existingWallet = await this.prisma.category.findFirst({
+          where: {
+            name: cat.name,
+            type: cat.type,
+            walletId: wallet.id,
+          },
+        });
+
+        // Solo crear si no existe en la billetera
+        if (!existingWallet) {
+          await this.prisma.category.create({
+            data: {
+              name: cat.name,
+              type: cat.type,
+              description: cat.description,
+              isSystem: true,
+              wallet: { connect: { id: wallet.id } },
+            },
+          });
+        }
+      }
     }
 
     return wallet;

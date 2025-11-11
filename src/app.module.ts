@@ -8,6 +8,7 @@ import { TransactionsModule } from './transactions/transactions.module';
 import { CategoriesModule } from './categories/categories.module';
 import { GoalsModule } from './goals/goals.module';
 import { InvitationsModule } from './invitations/invitations.module';
+import { RemindersModule } from './reminders/reminders.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { InvitationsModule } from './invitations/invitations.module';
     CategoriesModule,
     GoalsModule,
     InvitationsModule,
+    RemindersModule,
   ],
   controllers: [AppController],
 })

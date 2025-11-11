@@ -80,60 +80,61 @@ export class TransactionsService {
       });
 
       // Si es un aporte en billetera grupal (INCOME), actualizar el progreso de las metas activas
-    if (wallet.type === 'GROUP' && dto.type === 'INCOME') {
-      const activeGoals = await this.prisma.goal.findMany({
-        where: {
-          walletId: dto.walletId,
-          status: 'ACTIVE',
-        },
-      });
-
-      // Actualizar cada meta activa con el monto del aporte y registrar quién contribuyó
-      for (const goal of activeGoals) {
-        await this.goalsService.updateProgress(goal.id, Number(dto.amount), userId, dto.description);
-      }
-    }
-
-    // Si es un gasto (EXPENSE) que contiene "Aporte a meta" en la descripción, actualizar metas
-    // Esto permite que los aportes se hagan desde billeteras personales pero actualicen metas grupales
-    if (dto.type === 'EXPENSE' && dto.description && dto.description.includes('Aporte a meta')) {
-      // Buscar el nombre de la meta en la descripción (formato: "Aporte a meta: [nombre]")
-      const goalNameMatch = dto.description.match(/Aporte a meta: (.+)/);
-      if (goalNameMatch) {
-        const goalName = goalNameMatch[1].trim();
-        // Buscar la meta en todas las billeteras grupales a las que el usuario pertenece
-        const userWallets = await this.prisma.wallet.findMany({
+      if (wallet.type === 'GROUP' && dto.type === 'INCOME') {
+        const activeGoals = await this.prisma.goal.findMany({
           where: {
-            OR: [
-              { createdById: userId },
-              { members: { some: { userId } } },
-            ],
-            type: 'GROUP',
-          },
-          include: {
-            goals: {
-              where: {
-                status: { in: ['ACTIVE', 'PAUSED'] }, // También incluir metas pausadas
-              },
-            },
+            walletId: dto.walletId,
+            status: 'ACTIVE',
           },
         });
 
-        // Encontrar la meta en cualquiera de las billeteras grupales del usuario
-        let goalFound = false;
-        for (const wallet of userWallets) {
-          const goal = wallet.goals.find(g => g.name === goalName);
-          if (goal) {
-            // Usar el servicio inyectado para actualizar el progreso
-            await this.goalsService.updateProgress(goal.id, Number(dto.amount), userId, dto.description);
-            goalFound = true;
-            break; // Solo actualizar la primera meta encontrada
-          }
+        // Actualizar cada meta activa con el monto del aporte y registrar quién contribuyó
+        for (const goal of activeGoals) {
+          await this.goalsService.updateProgress(goal.id, Number(dto.amount), userId, dto.description);
         }
-        
-        // Si no se encontró la meta, registrar un error pero no fallar la transacción
-        if (!goalFound) {
-          console.warn(`Meta "${goalName}" no encontrada para el usuario ${userId}`);
+      }
+
+      // Si es un gasto (EXPENSE) que contiene "Aporte a meta" en la descripción, actualizar metas
+      // Esto permite que los aportes se hagan desde billeteras personales pero actualicen metas grupales
+      if (dto.type === 'EXPENSE' && dto.description && dto.description.includes('Aporte a meta')) {
+        // Buscar el nombre de la meta en la descripción (formato: "Aporte a meta: [nombre]")
+        const goalNameMatch = dto.description.match(/Aporte a meta: (.+)/);
+        if (goalNameMatch) {
+          const goalName = goalNameMatch[1].trim();
+          // Buscar la meta en todas las billeteras grupales a las que el usuario pertenece
+          const userWallets = await this.prisma.wallet.findMany({
+            where: {
+              OR: [
+                { createdById: userId },
+                { members: { some: { userId } } },
+              ],
+              type: 'GROUP',
+            },
+            include: {
+              goals: {
+                where: {
+                  status: { in: ['ACTIVE', 'PAUSED'] }, // También incluir metas pausadas
+                },
+              },
+            },
+          });
+
+          // Encontrar la meta en cualquiera de las billeteras grupales del usuario
+          let goalFound = false;
+          for (const wallet of userWallets) {
+            const goal = wallet.goals.find(g => g.name === goalName);
+            if (goal) {
+              // Usar el servicio inyectado para actualizar el progreso
+              await this.goalsService.updateProgress(goal.id, Number(dto.amount), userId, dto.description);
+              goalFound = true;
+              break; // Solo actualizar la primera meta encontrada
+            }
+          }
+          
+          // Si no se encontró la meta, registrar un error pero no fallar la transacción
+          if (!goalFound) {
+            console.warn(`Meta "${goalName}" no encontrada para el usuario ${userId}`);
+          }
         }
       }
 
