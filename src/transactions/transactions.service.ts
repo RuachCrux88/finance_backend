@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
@@ -37,7 +38,7 @@ export class TransactionsService {
       const transactionData: Prisma.TransactionCreateInput = {
         wallet: { connect: { id: dto.walletId } },
         type: dto.type,
-        amount: new Prisma.Decimal(dto.amount),
+        amount: new Decimal(dto.amount),
         description: dto.description ?? null,
         paidBy: { connect: { id: dto.paidByUserId } },
         createdBy: { connect: { id: userId } }, // ✅ requerido por tu modelo
@@ -53,7 +54,7 @@ export class TransactionsService {
         transactionData.splits = {
           create: dto.splits.map((s) => ({
             owedBy: { connect: { id: s.owedByUserId } },
-            amount: new Prisma.Decimal(s.amount),
+            amount: new Decimal(s.amount),
           })),
         };
       }
@@ -193,7 +194,7 @@ export class TransactionsService {
       }
     }
     if (dto.type) data.type = dto.type;
-    if (dto.amount !== undefined) data.amount = new Prisma.Decimal(dto.amount);
+    if (dto.amount !== undefined) data.amount = new Decimal(dto.amount);
     if (dto.description !== undefined) data.description = dto.description;
     if (dto.paidByUserId) data.paidBy = { connect: { id: dto.paidByUserId } };
 

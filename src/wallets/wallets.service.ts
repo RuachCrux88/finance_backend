@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateWalletDto } from './dto';
 import { Role, Prisma } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 import { randomBytes } from 'crypto';
 
 @Injectable()
@@ -533,7 +534,7 @@ export class WalletsService {
         walletId,
         fromUserId,
         toUserId,
-        amount: new Prisma.Decimal(amount),
+        amount: new Decimal(amount),
         createdById: userId,
       },
     });
@@ -548,7 +549,7 @@ export class WalletsService {
           where: { walletId: null, name: 'Imprevistos y reparaciones', type: 'EXPENSE' },
         }))!.id,
         type: 'SETTLEMENT',
-        amount: new Prisma.Decimal(amount),
+        amount: new Decimal(amount),
         paidByUserId: fromUserId,
         createdById: userId,
         description: `Liquidación de deuda de ${fromUserId} a ${toUserId}`,
@@ -589,7 +590,7 @@ export class WalletsService {
           data: {
             transactionId: split.transactionId,
             owedByUserId: fromUserId,
-            amount: new Prisma.Decimal(splitAmount - remainingAmount),
+            amount: new Decimal(splitAmount - remainingAmount),
             settled: false,
           },
         });

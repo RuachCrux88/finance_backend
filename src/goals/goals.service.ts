@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateGoalDto } from './dto/create-goal.dto';
 import { Prisma } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 
 @Injectable()
 export class GoalsService {
@@ -39,8 +40,8 @@ export class GoalsService {
         walletId: dto.walletId || null,
         userId: dto.walletId ? null : userId,
         name: dto.name,
-        targetAmount: new Prisma.Decimal(dto.targetAmount),
-        currentAmount: new Prisma.Decimal(0),
+        targetAmount: new Decimal(dto.targetAmount),
+        currentAmount: new Decimal(0),
         deadline: dto.deadline ? new Date(dto.deadline) : null,
         createdById: userId,
       },
@@ -138,7 +139,7 @@ export class GoalsService {
     await this.prisma.goalProgress.create({
       data: {
         goalId,
-        amount: new Prisma.Decimal(amount),
+        amount: new Decimal(amount),
         note: note || null,
         createdById: userId,
       },
@@ -147,7 +148,7 @@ export class GoalsService {
     return this.prisma.goal.update({
       where: { id: goalId },
       data: {
-        currentAmount: new Prisma.Decimal(newCurrentAmount),
+        currentAmount: new Decimal(newCurrentAmount),
         status: newStatus as any,
       },
     });
@@ -169,7 +170,7 @@ export class GoalsService {
 
     const updateData: any = {};
     if (dto.name) updateData.name = dto.name;
-    if (dto.targetAmount !== undefined) updateData.targetAmount = new Prisma.Decimal(dto.targetAmount);
+    if (dto.targetAmount !== undefined) updateData.targetAmount = new Decimal(dto.targetAmount);
     if (dto.deadline !== undefined) updateData.deadline = dto.deadline ? new Date(dto.deadline) : null;
     if (dto.status && ['ACTIVE', 'PAUSED', 'CANCELLED', 'ACHIEVED'].includes(dto.status)) {
       updateData.status = dto.status;
