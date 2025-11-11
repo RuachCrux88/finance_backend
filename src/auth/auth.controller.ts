@@ -23,7 +23,7 @@ export class AuthController {
     try {
       // req.user viene del GoogleStrategy
       if (!req.user) {
-        const frontendUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'https://financefrontend-pink.vercel.app' || 'http://localhost:3000';
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
         return res.redirect(`${frontendUrl}/login?error=no_user`);
       }
 

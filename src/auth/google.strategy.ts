@@ -8,18 +8,11 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
   constructor() {
     // Construir la URL del callback dinámicamente
     const getCallbackURL = () => {
-      // Prioridad: API_BASE_URL > VERCEL_URL > NEXT_PUBLIC_API_BASE_URL > URL hardcodeada
       if (process.env.API_BASE_URL) {
         return `${process.env.API_BASE_URL}/auth/google/callback`;
       }
-      if (process.env.VERCEL_URL) {
-        return `https://${process.env.VERCEL_URL}/auth/google/callback`;
-      }
-      if (process.env.NEXT_PUBLIC_API_BASE_URL) {
-        return `${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/google/callback`;
-      }
-      // URL de producción hardcodeada como fallback
-      return 'https://financebackend-ecru.vercel.app/auth/google/callback';
+      // Fallback a localhost para desarrollo
+      return 'http://localhost:4000/auth/google/callback';
     };
 
     super({
