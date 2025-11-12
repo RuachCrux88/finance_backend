@@ -8,7 +8,7 @@ let cached: RequestHandler | null = null;
 
 async function loadHandler(): Promise<RequestHandler> {
   const modulePaths = [
-    "../dist/src/main.ts",
+    "../src/main.ts",
   ];
 
   let lastError: unknown;
