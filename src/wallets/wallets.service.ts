@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateWalletDto } from './dto';
-import { Role, Prisma } from '@prisma/client';
+
 import { Decimal } from '@prisma/client/runtime/library';
 import { randomBytes } from 'crypto';
 
