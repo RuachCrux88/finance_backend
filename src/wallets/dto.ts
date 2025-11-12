@@ -1,26 +1,23 @@
-import {
-  IsEnum,
-  IsOptional,
-  IsString,
-  MaxLength,
-  IsUUID,
-  IsEmail,
-  IsArray,
-  ArrayNotEmpty,
-} from 'class-validator';
-import { WalletType } from '@prisma/client';
+﻿import { IsEnum, IsOptional, IsString, MaxLength } from "class-validator";
+
+export const WalletTypeEnum = {
+  PERSONAL: "PERSONAL",
+  GROUP: "GROUP",
+} as const;
+
+type WalletTypeValues = typeof WalletTypeEnum[keyof typeof WalletTypeEnum];
 
 export class CreateWalletDto {
   @IsString()
   @MaxLength(60)
   name!: string;
 
-  @IsEnum(WalletType)
-  type!: WalletType; // PERSONAL | GROUP
+  @IsEnum(WalletTypeEnum)
+  type!: WalletTypeValues;
 
   @IsString()
   @IsOptional()
-  currency?: string; // Moneda (COP, USD, EUR, etc.)
+  currency?: string;
 }
 
 export class JoinWalletDto {
