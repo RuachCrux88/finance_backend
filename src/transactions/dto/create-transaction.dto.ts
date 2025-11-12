@@ -1,6 +1,7 @@
-import { IsUUID, IsEnum, IsNumber, Min, IsOptional, IsString, IsArray, ValidateNested, ValidateIf } from 'class-validator';
+﻿import { IsUUID, IsEnum, IsNumber, Min, IsOptional, IsString, IsArray, ValidateNested, ValidateIf } from 'class-validator';
 import { Type } from 'class-transformer';
-import { TransactionType } from '@prisma/client';
+import { TransactionTypeEnum } from '../../common/enums';
+import type { TransactionTypeValue } from '../../common/enums';
 import { CreateSplitDto } from './create-split.dto';
 
 export class CreateTransactionDto {
@@ -10,10 +11,10 @@ export class CreateTransactionDto {
   @IsOptional()
   @ValidateIf((o) => o.categoryId !== undefined && o.categoryId !== null)
   @IsUUID()
-  categoryId?: string;
+  categoryId?: string | null;
 
-  @IsEnum(TransactionType)
-  type!: TransactionType;
+  @IsEnum(TransactionTypeEnum)
+  type!: TransactionTypeValue;
 
   @IsNumber()
   @Min(0)

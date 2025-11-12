@@ -1,16 +1,22 @@
-import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
-import { CategoryType } from '@prisma/client';
+﻿import { IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength, IsUUID } from 'class-validator';
+import { CategoryTypeEnum } from '../../common/enums';
+import type { CategoryTypeValue } from '../../common/enums';
 
 export class CreateCategoryDto {
-  @IsString() @IsNotEmpty() @MaxLength(60)
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(60)
   name!: string;
 
-  @IsEnum(CategoryType)
-  type!: CategoryType;
+  @IsEnum(CategoryTypeEnum)
+  type!: CategoryTypeValue;
 
-  @IsOptional() @IsString() @MaxLength(140)
+  @IsOptional()
+  @IsString()
+  @MaxLength(140)
   description?: string;
 
-  @IsOptional() @IsUUID()
+  @IsOptional()
+  @IsUUID()
   walletId?: string;
 }

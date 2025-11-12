@@ -1,11 +1,6 @@
-﻿import { IsEnum, IsOptional, IsString, MaxLength } from "class-validator";
-
-export const WalletTypeEnum = {
-  PERSONAL: "PERSONAL",
-  GROUP: "GROUP",
-} as const;
-
-type WalletTypeValues = typeof WalletTypeEnum[keyof typeof WalletTypeEnum];
+﻿import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+import { WalletTypeEnum } from '../common/enums';
+import type { WalletTypeValue } from '../common/enums';
 
 export class CreateWalletDto {
   @IsString()
@@ -13,7 +8,7 @@ export class CreateWalletDto {
   name!: string;
 
   @IsEnum(WalletTypeEnum)
-  type!: WalletTypeValues;
+  type!: WalletTypeValue;
 
   @IsString()
   @IsOptional()

@@ -35,7 +35,7 @@ export class TransactionsService {
       }
 
       // Preparar los datos de la transacción
-      const transactionData: Prisma.TransactionCreateInput = {
+      const transactionData: any = {
         wallet: { connect: { id: dto.walletId } },
         type: dto.type,
         amount: new Decimal(dto.amount),
@@ -186,7 +186,7 @@ export class TransactionsService {
 
   // (si ya tienes update, no hace falta tocarlo para estos errores)
   async update(id: string, dto: UpdateTransactionDto) {
-    const data: Prisma.TransactionUpdateInput = {};
+    const data: Record<string, any> = {};
     if (dto.categoryId !== undefined) {
       if (dto.categoryId === null) {
         data.category = { disconnect: true };

@@ -1,17 +1,17 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { CategoryType } from '@prisma/client';
+﻿import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
+import { CategoryTypeValue } from '../common/enums';
 
 @Injectable()
 export class CategoriesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(userId: string, type?: CategoryType, walletId?: string) {
-    // Si se especifica walletId, devolver categorías de esa billetera + categorías globales (sin duplicados)
+  async list(userId: string, type?: CategoryTypeValue, walletId?: string) {
+    const typeFilter = type ? { type } : {};
+
     if (walletId) {
-      // Verificar que el usuario tenga acceso a la billetera
       const wallet = await this.prisma.wallet.findFirst({
         where: {
           id: walletId,
@@ -23,42 +23,33 @@ export class CategoriesService {
         throw new ForbiddenException('No tienes acceso a esta billetera');
       }
 
-      // Obtener categorías de la billetera
       const walletCategories = await this.prisma.category.findMany({
         where: {
-          AND: [
-            type ? { type } : {},
-            { walletId }, // Solo categorías de esta billetera
-          ],
+          ...typeFilter,
+          walletId,
         },
         orderBy: [{ isSystem: 'desc' }, { name: 'asc' }],
         take: 1000,
       });
 
-      // Obtener categorías globales del sistema
       const globalCategories = await this.prisma.category.findMany({
         where: {
-          AND: [
-            type ? { type } : {},
-            { walletId: null }, // Solo categorías globales
-            { isSystem: true },
-          ],
+          ...typeFilter,
+          walletId: null,
+          isSystem: true,
         },
         orderBy: [{ name: 'asc' }],
         take: 1000,
       });
 
-      // Combinar y eliminar duplicados por nombre y tipo
       const categoryMap = new Map<string, any>();
-      
-      // Primero agregar las de la billetera (tienen prioridad)
-      walletCategories.forEach(cat => {
+
+      walletCategories.forEach((cat) => {
         const key = `${cat.name}_${cat.type}`;
         categoryMap.set(key, cat);
       });
 
-      // Luego agregar las globales solo si no existen ya
-      globalCategories.forEach(cat => {
+      globalCategories.forEach((cat) => {
         const key = `${cat.name}_${cat.type}`;
         if (!categoryMap.has(key)) {
           categoryMap.set(key, cat);
@@ -66,7 +57,6 @@ export class CategoriesService {
       });
 
       return Array.from(categoryMap.values()).sort((a, b) => {
-        // Ordenar: primero isSystem, luego por nombre
         if (a.isSystem !== b.isSystem) {
           return a.isSystem ? -1 : 1;
         }
@@ -74,22 +64,18 @@ export class CategoriesService {
       });
     }
 
-    // Si no hay walletId, devolver categorías globales del sistema (sin duplicados)
     const allCategories = await this.prisma.category.findMany({
       where: {
-        AND: [
-          type ? { type } : {},
-          { walletId: null }, // Solo categorías globales
-          { OR: [{ isSystem: true }, { createdById: userId }] },
-        ],
+        ...typeFilter,
+        walletId: null,
+        OR: [{ isSystem: true }, { createdById: userId }],
       },
       orderBy: [{ isSystem: 'desc' }, { name: 'asc' }],
-      take: 1000, // Limitar resultados para evitar problemas
+      take: 1000,
     });
 
-    // Eliminar duplicados por nombre y tipo (mantener solo la primera ocurrencia)
     const categoryMap = new Map<string, any>();
-    allCategories.forEach(cat => {
+    allCategories.forEach((cat) => {
       const key = `${cat.name}_${cat.type}`;
       if (!categoryMap.has(key)) {
         categoryMap.set(key, cat);
@@ -97,7 +83,6 @@ export class CategoriesService {
     });
 
     return Array.from(categoryMap.values()).sort((a, b) => {
-      // Ordenar: primero isSystem, luego por nombre
       if (a.isSystem !== b.isSystem) {
         return a.isSystem ? -1 : 1;
       }
@@ -106,7 +91,6 @@ export class CategoriesService {
   }
 
   async create(userId: string, dto: CreateCategoryDto) {
-    // Si se especifica walletId, verificar que el usuario sea dueño
     if (dto.walletId) {
       const wallet = await this.prisma.wallet.findUnique({
         where: { id: dto.walletId },
@@ -117,7 +101,7 @@ export class CategoriesService {
       }
 
       if (wallet.createdById !== userId) {
-        throw new ForbiddenException('Solo el dueño puede crear categorías para esta billetera');
+        throw new ForbiddenException('Solo el dueÃ±o puede crear categorÃ­as para esta billetera');
       }
     }
 
@@ -135,23 +119,18 @@ export class CategoriesService {
 
   async update(userId: string, id: string, dto: UpdateCategoryDto) {
     const cat = await this.prisma.category.findUnique({ where: { id } });
-    if (!cat) throw new NotFoundException('Categoría no existe');
-    // Permitir editar categorías del sistema (solo descripción) y categorías propias
+    if (!cat) throw new NotFoundException('CategorÃ­a no existe');
     if (cat.isSystem) {
-      // Para categorías del sistema, solo permitir modificar la descripción
       if (dto.name !== undefined || dto.type !== undefined) {
-        throw new ForbiddenException('No puedes modificar el nombre o tipo de categorías del sistema');
+        throw new ForbiddenException('No puedes modificar el nombre o tipo de categorÃ­as del sistema');
       }
       return this.prisma.category.update({
         where: { id },
-        data: {
-          ...(dto.description !== undefined ? { description: dto.description } : {}),
-        },
+        data: dto.description !== undefined ? { description: dto.description } : {},
       });
     }
-    // Para categorías propias, permitir modificar todo
     if (cat.createdById !== userId) {
-      throw new ForbiddenException('No puedes editar esta categoría');
+      throw new ForbiddenException('No puedes editar esta categorÃ­a');
     }
     return this.prisma.category.update({
       where: { id },
@@ -168,21 +147,18 @@ export class CategoriesService {
       where: { id },
       include: { transactions: { take: 1 } },
     });
-    if (!cat) throw new NotFoundException('Categoría no existe');
+    if (!cat) throw new NotFoundException('CategorÃ­a no existe');
     if (cat.isSystem || cat.createdById !== userId) {
-      throw new ForbiddenException('No puedes eliminar esta categoría');
+      throw new ForbiddenException('No puedes eliminar esta categorÃ­a');
     }
     if (cat.transactions.length > 0) {
-      throw new BadRequestException(
-        'No se puede eliminar: la categoría tiene transacciones',
-      );
+      throw new BadRequestException('No se puede eliminar: la categorÃ­a tiene transacciones');
     }
     await this.prisma.category.delete({ where: { id } });
     return { ok: true };
   }
 
   async cleanupDuplicates(userId: string) {
-    // Obtener todas las categorías agrupadas por nombre y tipo
     const allCategories = await this.prisma.category.findMany({
       include: {
         transactions: { take: 1 },
@@ -190,9 +166,8 @@ export class CategoriesService {
       },
     });
 
-    // Agrupar por nombre y tipo
     const grouped = new Map<string, any[]>();
-    allCategories.forEach(cat => {
+    allCategories.forEach((cat) => {
       const key = `${cat.name}_${cat.type}`;
       if (!grouped.has(key)) {
         grouped.set(key, []);
@@ -202,29 +177,22 @@ export class CategoriesService {
 
     let deletedCount = 0;
 
-    // Para cada grupo, mantener solo una categoría (prioridad: global > billetera)
-    for (const [key, categories] of grouped.entries()) {
-      if (categories.length <= 1) continue; // No hay duplicados
+    for (const categories of grouped.values()) {
+      if (categories.length <= 1) continue;
 
-      // Separar globales y de billetera
-      const global = categories.filter(c => c.walletId === null);
-      const walletSpecific = categories.filter(c => c.walletId !== null);
+      const global = categories.filter((c) => c.walletId === null);
+      const walletSpecific = categories.filter((c) => c.walletId !== null);
 
-      // Si hay una global, eliminar todas las de billetera que sean del sistema
       if (global.length > 0) {
         for (const cat of walletSpecific) {
-          // Solo eliminar si es del sistema y no tiene transacciones
           if (cat.isSystem && cat.transactions.length === 0) {
             await this.prisma.category.delete({ where: { id: cat.id } });
             deletedCount++;
           }
         }
       } else if (walletSpecific.length > 1) {
-        // Si no hay globales pero hay múltiples de billetera, mantener solo la primera
-        const toKeep = walletSpecific[0];
-        for (let i = 1; i < walletSpecific.length; i++) {
-          const cat = walletSpecific[i];
-          // Solo eliminar si no tiene transacciones
+        const [toKeep, ...rest] = walletSpecific;
+        for (const cat of rest) {
           if (cat.transactions.length === 0) {
             await this.prisma.category.delete({ where: { id: cat.id } });
             deletedCount++;
@@ -233,9 +201,9 @@ export class CategoriesService {
       }
     }
 
-    return { 
-      message: `Se eliminaron ${deletedCount} categorías duplicadas`,
-      deletedCount 
+    return {
+      message: `Se eliminaron ${deletedCount} categorÃ­as duplicadas`,
+      deletedCount,
     };
   }
 }

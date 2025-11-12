@@ -1,9 +1,19 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+﻿import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
-import { CategoryType } from '@prisma/client';
+import { CategoryTypeEnum } from '../common/enums';
+import type { CategoryTypeValue } from '../common/enums';
 import { JwtAuthGuard } from '../auth/jwt.guard';
+
+function parseCategoryType(type?: string): CategoryTypeValue | undefined {
+  if (!type) return undefined;
+  const upper = type.toUpperCase();
+  if (upper in CategoryTypeEnum) {
+    return CategoryTypeEnum[upper as keyof typeof CategoryTypeEnum];
+  }
+  return undefined;
+}
 
 @UseGuards(JwtAuthGuard)
 @Controller('categories')
@@ -11,13 +21,13 @@ export class CategoriesController {
   constructor(private readonly svc: CategoriesService) {}
 
   @Get()
-  async list(@Req() req, @Query('type') type?: CategoryType, @Query('walletId') walletId?: string) {
-    try {
-      return await this.svc.list(req.user.id, type, walletId);
-    } catch (error: any) {
-      console.error('Error listing categories:', error);
-      throw error;
-    }
+  list(
+    @Req() req,
+    @Query('type') type?: string,
+    @Query('walletId') walletId?: string,
+  ) {
+    const parsedType = parseCategoryType(type);
+    return this.svc.list(req.user.id, parsedType, walletId);
   }
 
   @Post()
@@ -36,7 +46,7 @@ export class CategoriesController {
   }
 
   @Post('cleanup-duplicates')
-  async cleanupDuplicates(@Req() req) {
+  cleanupDuplicates(@Req() req) {
     return this.svc.cleanupDuplicates(req.user.id);
   }
 }

@@ -41,7 +41,7 @@ export class WalletsService {
         // Para GROUP, agrega miembro OWNER
         members:
           dto.type === 'GROUP'
-            ? { create: [{ userId, role: 'OWNER' as Role }] }
+            ? { create: [{ userId, role: 'OWNER' }] }
             : undefined,
       },
     });
