@@ -5,7 +5,11 @@ import serverlessExpress from '@vendia/serverless-express';
 import type { Callback, Context, Handler } from 'aws-lambda';
 import { AppModule } from './app.module';
 
-async function createApp() {
+let appPromise: ReturnType<typeof createNestApp> | null = null;
+let lambdaHandler: Handler | null = null;
+let expressInstance: any = null;
+
+async function createNestApp() {
   const app = await NestFactory.create(AppModule);
 
   app.use(cookieParser());
@@ -22,17 +26,22 @@ async function createApp() {
     }),
   );
 
+  await app.init();
+  expressInstance = app.getHttpAdapter().getInstance();
+  lambdaHandler = serverlessExpress({ app: expressInstance });
+
   return app;
 }
 
-async function createNestServer() {
-  const app = await createApp();
-  await app.init();
-  return app;
+async function getApp() {
+  if (!appPromise) {
+    appPromise = createNestApp();
+  }
+  return appPromise;
 }
 
 export async function bootstrap() {
-  const app = await createNestServer();
+  const app = await getApp();
   const port = process.env.PORT || 4000;
   await app.listen(port);
   console.log(`Application is running on: http://localhost:${port}`);
@@ -47,14 +56,18 @@ if (!isServerless) {
   });
 }
 
-let cachedServer: Handler | null = null;
-
 export const handler: Handler = async (event: any, context: Context, callback: Callback) => {
-  if (!cachedServer) {
-    const app = await createNestServer();
-    const expressApp = app.getHttpAdapter().getInstance();
-    cachedServer = serverlessExpress({ app: expressApp });
+  await getApp();
+  if (!lambdaHandler) {
+    throw new Error('Lambda handler not initialized');
   }
-
-  return cachedServer(event, context, callback);
+  return lambdaHandler(event, context, callback);
 };
+
+export default async function vercelHandler(req: any, res: any) {
+  await getApp();
+  if (!expressInstance) {
+    throw new Error('Express instance not initialized');
+  }
+  return expressInstance(req, res);
+}
