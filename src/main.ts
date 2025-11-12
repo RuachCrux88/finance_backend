@@ -25,8 +25,14 @@ async function createApp() {
   return app;
 }
 
-export async function bootstrap() {
+async function createNestServer() {
   const app = await createApp();
+  await app.init();
+  return app;
+}
+
+export async function bootstrap() {
+  const app = await createNestServer();
   const port = process.env.PORT || 4000;
   await app.listen(port);
   console.log(`Application is running on: http://localhost:${port}`);
@@ -45,8 +51,7 @@ let cachedServer: Handler | null = null;
 
 export const handler: Handler = async (event: any, context: Context, callback: Callback) => {
   if (!cachedServer) {
-    const app = await createApp();
-    await app.init();
+    const app = await createNestServer();
     const expressApp = app.getHttpAdapter().getInstance();
     cachedServer = serverlessExpress({ app: expressApp });
   }
