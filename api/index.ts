@@ -1,6 +1,6 @@
-import path from 'node:path';
-import { pathToFileURL } from 'node:url';
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 type RequestHandler = (req: VercelRequest, res: VercelResponse) => Promise<void>;
 
@@ -8,11 +8,11 @@ let cached: RequestHandler | null = null;
 
 async function loadHandler(): Promise<RequestHandler> {
   const modulePaths = [
-    '../dist/src/main.js',
-    '../dist/main.js',
-    '../dist/src/main.mjs',
-    '../dist/main.mjs',
-    '../dist/main.cjs',
+    "../dist/src/main.js",
+    "../dist/main.js",
+    "../dist/src/main.mjs",
+    "../dist/main.mjs",
+    "../dist/main.cjs",
   ];
 
   let lastError: unknown;
@@ -21,26 +21,28 @@ async function loadHandler(): Promise<RequestHandler> {
     try {
       const absolute = path.join(__dirname, relPath);
       const mod = await import(pathToFileURL(absolute).href);
-      if (typeof mod.default === 'function') {
-        return mod.default as RequestHandler;
-      }
-      if (typeof mod.vercelHandler === 'function') {
-        return mod.vercelHandler as RequestHandler;
-      }
-      if (typeof mod === 'function') {
-        return mod as RequestHandler;
+      const candidate =
+        (typeof mod.default === "function" && mod.default) ||
+        (typeof mod.vercelHandler === "function" && mod.vercelHandler) ||
+        (typeof mod === "function" ? mod : null);
+
+      if (candidate) {
+        return candidate as RequestHandler;
       }
     } catch (error) {
       lastError = error;
     }
   }
 
-  throw lastError ?? new Error('Unable to locate compiled Nest handler');
+  throw lastError ?? new Error("Unable to locate compiled Nest handler");
 }
 
 async function getServer(): Promise<RequestHandler> {
   if (!cached) {
     cached = await loadHandler();
+  }
+  if (!cached) {
+    throw new Error("Handler not initialized");
   }
   return cached;
 }
