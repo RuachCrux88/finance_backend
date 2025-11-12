@@ -2,14 +2,17 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-let cached: ((req: VercelRequest, res: VercelResponse) => Promise<void>) | null = null;
+type RequestHandler = (req: VercelRequest, res: VercelResponse) => Promise<void>;
 
-async function loadHandler() {
+let cached: RequestHandler | null = null;
+
+async function loadHandler(): Promise<RequestHandler> {
   const modulePaths = [
     '../dist/src/main.js',
     '../dist/main.js',
     '../dist/src/main.mjs',
     '../dist/main.mjs',
+    '../dist/main.cjs',
   ];
 
   let lastError: unknown;
@@ -19,13 +22,13 @@ async function loadHandler() {
       const absolute = path.join(__dirname, relPath);
       const mod = await import(pathToFileURL(absolute).href);
       if (typeof mod.default === 'function') {
-        return mod.default as (req: VercelRequest, res: VercelResponse) => Promise<void>;
+        return mod.default as RequestHandler;
       }
       if (typeof mod.vercelHandler === 'function') {
-        return mod.vercelHandler;
+        return mod.vercelHandler as RequestHandler;
       }
       if (typeof mod === 'function') {
-        return mod as (req: VercelRequest, res: VercelResponse) => Promise<void>;
+        return mod as RequestHandler;
       }
     } catch (error) {
       lastError = error;
@@ -35,7 +38,7 @@ async function loadHandler() {
   throw lastError ?? new Error('Unable to locate compiled Nest handler');
 }
 
-async function getServer() {
+async function getServer(): Promise<RequestHandler> {
   if (!cached) {
     cached = await loadHandler();
   }
