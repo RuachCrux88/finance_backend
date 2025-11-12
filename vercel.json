@@ -3,11 +3,7 @@
   "buildCommand": "npm run build",
   "functions": {
     "api/index.ts": {
-      "includeFiles": [
-        "node_modules/.prisma/client/**",
-        "node_modules/@prisma/client/**",
-        "prisma/schema.prisma"
-      ]
+      "includeFiles": "node_modules/.prisma/client/**"
     }
   },
   "builds": [
