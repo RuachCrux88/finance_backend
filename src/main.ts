@@ -5,9 +5,16 @@ import serverlessExpress from '@vendia/serverless-express';
 import type { Callback, Context, Handler } from 'aws-lambda';
 import { AppModule } from './app.module';
 
-let appPromise: ReturnType<typeof createNestApp> | null = null;
-let lambdaHandler: Handler | null = null;
-let expressInstance: any = null;
+declare const module: any;
+
+declare global {
+  // eslint-disable-next-line no-var
+  var __nestServer: ReturnType<typeof createNestApp> | null | undefined;
+  // eslint-disable-next-line no-var
+  var __nestExpress: any;
+  // eslint-disable-next-line no-var
+  var __nestLambda: Handler | null | undefined;
+}
 
 async function createNestApp() {
   const app = await NestFactory.create(AppModule);
@@ -27,17 +34,18 @@ async function createNestApp() {
   );
 
   await app.init();
-  expressInstance = app.getHttpAdapter().getInstance();
-  lambdaHandler = serverlessExpress({ app: expressInstance });
+
+  globalThis.__nestExpress = app.getHttpAdapter().getInstance();
+  globalThis.__nestLambda = serverlessExpress({ app: globalThis.__nestExpress });
 
   return app;
 }
 
 async function getApp() {
-  if (!appPromise) {
-    appPromise = createNestApp();
+  if (!globalThis.__nestServer) {
+    globalThis.__nestServer = createNestApp();
   }
-  return appPromise;
+  return globalThis.__nestServer;
 }
 
 export async function bootstrap() {
@@ -58,16 +66,23 @@ if (!isServerless) {
 
 export const handler: Handler = async (event: any, context: Context, callback: Callback) => {
   await getApp();
-  if (!lambdaHandler) {
+  if (!globalThis.__nestLambda) {
     throw new Error('Lambda handler not initialized');
   }
-  return lambdaHandler(event, context, callback);
+  return globalThis.__nestLambda(event, context, callback);
 };
 
 export default async function vercelHandler(req: any, res: any) {
   await getApp();
-  if (!expressInstance) {
+  if (!globalThis.__nestExpress) {
     throw new Error('Express instance not initialized');
   }
-  return expressInstance(req, res);
+  return globalThis.__nestExpress(req, res);
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = vercelHandler;
+  module.exports.default = vercelHandler;
+  module.exports.handler = handler;
+  module.exports.bootstrap = bootstrap;
 }
