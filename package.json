@@ -14,6 +14,9 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "db:push": "prisma db push",
     "db:seed": "ts-node prisma/seed.ts",
+    "db:check-users": "ts-node scripts/check-users.ts",
+    "db:view-tables": "ts-node scripts/view-tables.ts",
+    "db:studio": "prisma studio",
     "prisma:generate": "prisma generate",
     "postinstall": "prisma generate"
   },

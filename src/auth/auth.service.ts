@@ -8,6 +8,8 @@ interface GoogleUser {
   email: string;
   name?: string;
   providerId: string;
+  accessToken?: string;
+  refreshToken?: string;
 }
 
 @Injectable()
@@ -24,27 +26,29 @@ export class AuthService {
     }
 
     try {
-      // Primero intentamos encontrar el usuario por googleId
-      let user = await this.prisma.user.findUnique({
-        where: { googleId: userFromStrategy.providerId },
+      // Buscar cuenta de Google OAuth en Account
+      const account = await this.prisma.account.findUnique({
+        where: {
+          provider_providerAccountId: {
+            provider: 'google',
+            providerAccountId: userFromStrategy.providerId,
+          },
+        },
+        include: { user: true },
       });
 
-      // Si no existe por googleId, buscamos por email
-      if (!user) {
-        user = await this.prisma.user.findUnique({
-          where: { email: userFromStrategy.email },
-        });
+      let user = account?.user ?? null;
 
-        // Si existe por email pero no tiene googleId, actualizamos el googleId
-        if (user && !user.googleId) {
-          user = await this.prisma.user.update({
-            where: { id: user.id },
-            data: { googleId: userFromStrategy.providerId },
-          });
-        }
+      // Si no existe la cuenta, buscamos usuario por email
+      if (!user) {
+        const userByEmail = await this.prisma.user.findUnique({
+          where: { email: userFromStrategy.email },
+          include: { accounts: true },
+        });
+        user = userByEmail;
       }
 
-      // Si aún no existe, creamos el usuario
+      // Si aún no existe, creamos el usuario y su cuenta de Google
       if (!user) {
         // Generar código único para la billetera personal
         let inviteCode = randomBytes(4).toString('hex').toUpperCase();
@@ -66,8 +70,20 @@ export class AuthService {
           data: {
             email: userFromStrategy.email,
             name: userFromStrategy.name ?? '',
-            googleId: userFromStrategy.providerId,
             emailVerifiedAt: new Date(), // Google ya verificó el email
+            // Crear la cuenta de Google OAuth
+            accounts: {
+              create: {
+                type: 'oauth',
+                provider: 'google',
+                providerAccountId: userFromStrategy.providerId,
+                access_token: userFromStrategy.accessToken,
+                refresh_token: userFromStrategy.refreshToken,
+                expires_at: Math.floor(Date.now() / 1000) + 3600, // 1 hora por defecto
+                token_type: 'Bearer',
+                scope: 'openid profile email',
+              },
+            },
             // Crear automáticamente la billetera personal predefinida
             walletsOwned: {
               create: {
@@ -80,6 +96,58 @@ export class AuthService {
             },
           },
         });
+      } else {
+        // Si el usuario existe pero no tiene cuenta de Google, la creamos
+        // Verificar si el usuario ya tiene una cuenta de Google (puede haber sido creada antes)
+        // Necesitamos recargar el usuario con sus cuentas si no las tenemos
+        const userWithAccounts = await this.prisma.user.findUnique({
+          where: { id: user.id },
+          include: { accounts: true },
+        });
+        
+        const existingGoogleAccount = userWithAccounts?.accounts?.find(
+          (acc) => acc.provider === 'google' && acc.providerAccountId === userFromStrategy.providerId,
+        );
+
+        if (!account && !existingGoogleAccount) {
+          // Crear la cuenta de Google OAuth
+          await this.prisma.account.create({
+            data: {
+              userId: user.id,
+              type: 'oauth',
+              provider: 'google',
+              providerAccountId: userFromStrategy.providerId,
+              access_token: userFromStrategy.accessToken,
+              refresh_token: userFromStrategy.refreshToken,
+              expires_at: Math.floor(Date.now() / 1000) + 3600, // 1 hora por defecto
+              token_type: 'Bearer',
+              scope: 'openid profile email',
+            },
+          });
+        } else if (account || existingGoogleAccount) {
+          // Actualizar tokens si la cuenta ya existe
+          const accountToUpdate = account || existingGoogleAccount;
+          if (accountToUpdate) {
+            await this.prisma.account.update({
+              where: {
+                id: accountToUpdate.id,
+              },
+              data: {
+                access_token: userFromStrategy.accessToken,
+                refresh_token: userFromStrategy.refreshToken,
+                expires_at: Math.floor(Date.now() / 1000) + 3600,
+              },
+            });
+          }
+        }
+
+        // Actualizar nombre si está vacío o si viene de Google
+        if (!user.name && userFromStrategy.name) {
+          user = await this.prisma.user.update({
+            where: { id: user.id },
+            data: { name: userFromStrategy.name },
+          });
+        }
       }
 
       const payload = { sub: user.id, email: user.email };
@@ -93,7 +161,7 @@ export class AuthService {
       // Manejo de errores de Prisma (duplicados, etc.)
       if (error.code === 'P2002') {
         // Unique constraint violation
-        throw new BadRequestException('User already exists with this email or Google ID');
+        throw new BadRequestException('User already exists with this email or Google account');
       }
       throw new InternalServerErrorException('Failed to authenticate with Google');
     }

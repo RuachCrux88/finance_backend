@@ -29,9 +29,14 @@ export class TransactionsService {
         throw new ForbiddenException('No perteneces a esta billetera');
       }
 
-      // En billeteras grupales, solo permitir transacciones de tipo INCOME (aportes)
+      // En billeteras grupales, permitir INCOME (aportes) y EXPENSE solo si es un aporte a meta
+      // Los aportes a metas son EXPENSE que cuentan como gasto para el usuario que aporta
       if (wallet.type === 'GROUP' && dto.type !== 'INCOME') {
-        throw new BadRequestException('En billeteras grupales solo se permiten aportes (INCOME)');
+        // Permitir EXPENSE solo si es un aporte a meta (descripción contiene "Aporte a meta")
+        const isGoalContribution = dto.description && dto.description.includes('Aporte a meta');
+        if (!isGoalContribution) {
+          throw new BadRequestException('En billeteras grupales solo se permiten aportes (INCOME) o aportes a metas (EXPENSE con descripción "Aporte a meta")');
+        }
       }
 
       // Preparar los datos de la transacción
@@ -95,45 +100,62 @@ export class TransactionsService {
       }
 
       // Si es un gasto (EXPENSE) que contiene "Aporte a meta" en la descripción, actualizar metas
-      // Esto permite que los aportes se hagan desde billeteras personales pero actualicen metas grupales
+      // Esto permite que los aportes se hagan en billeteras grupales y actualicen metas grupales
+      // Los aportes cuentan como gasto solo para el usuario que aporta (paidByUserId)
+      // y NO cuentan como ingreso para otros usuarios
       if (dto.type === 'EXPENSE' && dto.description && dto.description.includes('Aporte a meta')) {
         // Buscar el nombre de la meta en la descripción (formato: "Aporte a meta: [nombre]")
         const goalNameMatch = dto.description.match(/Aporte a meta: (.+)/);
         if (goalNameMatch) {
           const goalName = goalNameMatch[1].trim();
-          // Buscar la meta en todas las billeteras grupales a las que el usuario pertenece
-          const userWallets = await this.prisma.wallet.findMany({
-            where: {
-              OR: [
-                { createdById: userId },
-                { members: { some: { userId } } },
-              ],
-              type: 'GROUP',
-            },
-            include: {
-              goals: {
-                where: {
-                  status: { in: ['ACTIVE', 'PAUSED'] }, // También incluir metas pausadas
+          
+          // Si la transacción es en una billetera grupal, buscar la meta en esa billetera
+          if (wallet.type === 'GROUP') {
+            const goal = await this.prisma.goal.findFirst({
+              where: {
+                walletId: dto.walletId,
+                name: goalName,
+                status: { in: ['ACTIVE', 'PAUSED'] },
+              },
+            });
+            
+            if (goal) {
+              await this.goalsService.updateProgress(goal.id, Number(dto.amount), userId, dto.description);
+            } else {
+              console.warn(`Meta "${goalName}" no encontrada en la billetera ${dto.walletId}`);
+            }
+          } else {
+            // Si es en billetera personal, buscar en todas las billeteras grupales del usuario
+            const userWallets = await this.prisma.wallet.findMany({
+              where: {
+                OR: [
+                  { createdById: userId },
+                  { members: { some: { userId } } },
+                ],
+                type: 'GROUP',
+              },
+              include: {
+                goals: {
+                  where: {
+                    status: { in: ['ACTIVE', 'PAUSED'] },
+                  },
                 },
               },
-            },
-          });
+            });
 
-          // Encontrar la meta en cualquiera de las billeteras grupales del usuario
-          let goalFound = false;
-          for (const wallet of userWallets) {
-            const goal = wallet.goals.find(g => g.name === goalName);
-            if (goal) {
-              // Usar el servicio inyectado para actualizar el progreso
-              await this.goalsService.updateProgress(goal.id, Number(dto.amount), userId, dto.description);
-              goalFound = true;
-              break; // Solo actualizar la primera meta encontrada
+            let goalFound = false;
+            for (const groupWallet of userWallets) {
+              const goal = groupWallet.goals.find(g => g.name === goalName);
+              if (goal) {
+                await this.goalsService.updateProgress(goal.id, Number(dto.amount), userId, dto.description);
+                goalFound = true;
+                break;
+              }
             }
-          }
-          
-          // Si no se encontró la meta, registrar un error pero no fallar la transacción
-          if (!goalFound) {
-            console.warn(`Meta "${goalName}" no encontrada para el usuario ${userId}`);
+            
+            if (!goalFound) {
+              console.warn(`Meta "${goalName}" no encontrada para el usuario ${userId}`);
+            }
           }
         }
       }
@@ -208,7 +230,9 @@ export class TransactionsService {
 
   // Obtener gastos e ingresos agrupados por día, semana o mes con detalles
   async getDailyExpensesAndIncome(userId: string, days: number = 90, groupBy: 'day' | 'week' | 'month' = 'day') {
-    const maxDays = Math.min(Math.max(days, 7), 1095);
+    // Permitir mínimo 1 día para usuarios recién registrados
+    const minDays = groupBy === 'day' ? 1 : 7;
+    const maxDays = Math.min(Math.max(days, minDays), 1095);
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - maxDays);
 
@@ -289,7 +313,7 @@ export class TransactionsService {
       groupedMap.set(key, current);
     });
 
-    return Array.from(groupedMap.entries())
+    const result = Array.from(groupedMap.entries())
       .map(([date, data]) => ({
         date,
         expenses: Number(data.expenses.toFixed(2)),
@@ -297,6 +321,44 @@ export class TransactionsService {
         details: data.details,
       }))
       .sort((a, b) => a.date.localeCompare(b.date));
+
+    // Si agrupamos por día, rellenar todos los días faltantes con valores de 0
+    if (groupBy === 'day') {
+      const filledResult: typeof result = [];
+      const endDate = new Date();
+      const currentDate = new Date(startDate);
+      
+      // Crear un Set con las fechas que ya tienen datos
+      const existingDates = new Set(result.map(r => r.date));
+      
+      // Iterar día por día desde startDate hasta hoy
+      while (currentDate <= endDate) {
+        const dateKey = currentDate.toISOString().split('T')[0];
+        
+        if (existingDates.has(dateKey)) {
+          // Si ya existe, usar los datos existentes
+          const existing = result.find(r => r.date === dateKey);
+          if (existing) {
+            filledResult.push(existing);
+          }
+        } else {
+          // Si no existe, crear entrada con valores en 0
+          filledResult.push({
+            date: dateKey,
+            expenses: 0,
+            income: 0,
+            details: [],
+          });
+        }
+        
+        // Avanzar al siguiente día
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+      
+      return filledResult;
+    }
+
+    return result;
   }
 
   // Obtener gastos agrupados por día, semana o mes

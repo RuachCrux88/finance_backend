@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { GoalsService } from './goals.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { CreateGoalDto } from './dto/create-goal.dto';
@@ -31,8 +31,23 @@ export class GoalsController {
   }
 
   @Patch(':id')
-  update(@Req() req: any, @Param('id') id: string, @Body() body: { name?: string; targetAmount?: number; deadline?: string; status?: string }) {
+  update(@Req() req: any, @Param('id') id: string, @Body() body: { name?: string; targetAmount?: number; deadline?: string; status?: string; description?: string }) {
     return this.goalsService.update(req.user.id, id, body);
+  }
+
+  @Patch(':id/achieve')
+  markAsAchieved(@Req() req: any, @Param('id') id: string) {
+    return this.goalsService.markAsAchieved(req.user.id, id);
+  }
+
+  @Get('achieved')
+  getAchievedGoals(@Req() req: any, @Query('walletId') walletId?: string) {
+    return this.goalsService.getAchievedGoals(req.user.id, walletId);
+  }
+
+  @Get('pending')
+  getPendingGoals(@Req() req: any, @Query('walletId') walletId?: string) {
+    return this.goalsService.getPendingGoals(req.user.id, walletId);
   }
 
   @Delete(':id')

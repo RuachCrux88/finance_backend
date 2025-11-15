@@ -40,6 +40,7 @@ export class GoalsService {
         walletId: dto.walletId || null,
         userId: dto.walletId ? null : userId,
         name: dto.name,
+        description: dto.description || null,
         targetAmount: new Decimal(dto.targetAmount),
         currentAmount: new Decimal(0),
         deadline: dto.deadline ? new Date(dto.deadline) : null,
@@ -154,7 +155,7 @@ export class GoalsService {
     });
   }
 
-  async update(userId: string, goalId: string, dto: { name?: string; targetAmount?: number; deadline?: string; status?: string }) {
+  async update(userId: string, goalId: string, dto: { name?: string; targetAmount?: number; deadline?: string; status?: string; description?: string }) {
     const goal = await this.prisma.goal.findUnique({
       where: { id: goalId },
     });
@@ -170,6 +171,7 @@ export class GoalsService {
 
     const updateData: any = {};
     if (dto.name) updateData.name = dto.name;
+    if (dto.description !== undefined) updateData.description = dto.description;
     if (dto.targetAmount !== undefined) updateData.targetAmount = new Decimal(dto.targetAmount);
     if (dto.deadline !== undefined) updateData.deadline = dto.deadline ? new Date(dto.deadline) : null;
     if (dto.status && ['ACTIVE', 'PAUSED', 'CANCELLED', 'ACHIEVED'].includes(dto.status)) {
@@ -179,6 +181,108 @@ export class GoalsService {
     return this.prisma.goal.update({
       where: { id: goalId },
       data: updateData,
+    });
+  }
+
+  async markAsAchieved(userId: string, goalId: string) {
+    const goal = await this.prisma.goal.findUnique({
+      where: { id: goalId },
+      include: {
+        wallet: {
+          include: {
+            members: true,
+          },
+        },
+      },
+    });
+
+    if (!goal) {
+      throw new NotFoundException('Meta no encontrada');
+    }
+
+    // Verificar que el usuario tenga acceso
+    if (goal.createdById !== userId) {
+      if (goal.walletId && goal.wallet) {
+        const hasAccess = goal.wallet.createdById === userId || 
+                         goal.wallet.members.some(m => m.userId === userId);
+        if (!hasAccess) {
+          throw new ForbiddenException('No puedes marcar esta meta como cumplida');
+        }
+      } else if (goal.userId !== userId) {
+        throw new ForbiddenException('No puedes marcar esta meta como cumplida');
+      }
+    }
+
+    return this.prisma.goal.update({
+      where: { id: goalId },
+      data: {
+        status: 'ACHIEVED',
+      },
+    });
+  }
+
+  async getAchievedGoals(userId: string, walletId?: string) {
+    const where: any = {
+      status: 'ACHIEVED',
+    };
+
+    if (walletId) {
+      where.walletId = walletId;
+      // Verificar acceso a la billetera
+      const wallet = await this.prisma.wallet.findFirst({
+        where: {
+          id: walletId,
+          OR: [{ createdById: userId }, { members: { some: { userId } } }],
+        },
+      });
+      if (!wallet) {
+        throw new ForbiddenException('No perteneces a esta billetera');
+      }
+    } else {
+      where.userId = userId;
+      where.scope = 'USER';
+    }
+
+    return this.prisma.goal.findMany({
+      where,
+      include: {
+        createdBy: {
+          select: { id: true, name: true, email: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async getPendingGoals(userId: string, walletId?: string) {
+    const where: any = {
+      status: { in: ['ACTIVE', 'PAUSED'] },
+    };
+
+    if (walletId) {
+      where.walletId = walletId;
+      const wallet = await this.prisma.wallet.findFirst({
+        where: {
+          id: walletId,
+          OR: [{ createdById: userId }, { members: { some: { userId } } }],
+        },
+      });
+      if (!wallet) {
+        throw new ForbiddenException('No perteneces a esta billetera');
+      }
+    } else {
+      where.userId = userId;
+      where.scope = 'USER';
+    }
+
+    return this.prisma.goal.findMany({
+      where,
+      include: {
+        createdBy: {
+          select: { id: true, name: true, email: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
     });
   }
 

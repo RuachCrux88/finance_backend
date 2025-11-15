@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
@@ -49,7 +49,6 @@ model User {
   name                String?
   createdAt           DateTime           @default(now())
   emailVerifiedAt     DateTime?
-  password            String?
   googleId            String?            @unique
   accounts            Account[]
   categoriesCreated   Category[]         @relation("CategoryCreatedBy")
@@ -57,6 +56,7 @@ model User {
   Goal                Goal[]             @relation("GoalsUser")
   goalProgressCreated GoalProgress[]     @relation("GoalProgressCreatedBy")
   invitationsSent     Invitation[]       @relation("InvitationInvitedBy")
+  paymentReminders    PaymentReminder[]
   sessions            Session[]
   settlementsCreated  Settlement[]       @relation("SettlementCreatedBy")
   settlementsFrom     Settlement[]       @relation("SettlementFrom")
@@ -66,26 +66,25 @@ model User {
   TransactionSplit    TransactionSplit[] @relation("SplitsOwedBy")
   walletsOwned        Wallet[]           @relation("WalletOwner")
   walletMemberships   WalletMember[]
-  paymentReminders    PaymentReminder[]
 }
 
 model Wallet {
-  id           String         @id @default(uuid())
-  name         String
-  type         WalletType     @default(PERSONAL)
-  currency     String         @default("COP")
-  inviteCode   String         @unique
-  isDefault    Boolean        @default(false)
-  createdById  String
-  createdAt    DateTime       @default(now())
-  goals        Goal[]
-  invitations  Invitation[]
-  settlements  Settlement[]
-  transactions Transaction[]
-  categories   Category[]     @relation("WalletCategories")
-  createdBy    User           @relation("WalletOwner", fields: [createdById], references: [id])
-  members      WalletMember[]
+  id               String            @id @default(uuid())
+  name             String
+  type             WalletType        @default(PERSONAL)
+  currency         String            @default("COP")
+  createdById      String
+  createdAt        DateTime          @default(now())
+  inviteCode       String            @unique
+  isDefault        Boolean           @default(false)
+  categories       Category[]        @relation("WalletCategories")
+  goals            Goal[]
+  invitations      Invitation[]
   paymentReminders PaymentReminder[]
+  settlements      Settlement[]
+  transactions     Transaction[]
+  createdBy        User              @relation("WalletOwner", fields: [createdById], references: [id])
+  members          WalletMember[]
 }
 
 model WalletMember {
@@ -101,40 +100,40 @@ model WalletMember {
 }
 
 model Category {
-  id           String        @id @default(uuid())
-  name         String
-  type         CategoryType
-  description  String?
-  isSystem     Boolean       @default(true)
-  walletId     String?       // Categorías por billetera (null = categorías globales del sistema)
-  createdById  String?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  createdBy    User?         @relation("CategoryCreatedBy", fields: [createdById], references: [id])
-  wallet       Wallet?       @relation("WalletCategories", fields: [walletId], references: [id])
-  transactions Transaction[]
+  id               String            @id @default(uuid())
+  name             String
+  type             CategoryType
+  description      String?
+  isSystem         Boolean           @default(true)
+  createdById      String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  walletId         String?
+  createdBy        User?             @relation("CategoryCreatedBy", fields: [createdById], references: [id])
+  wallet           Wallet?           @relation("WalletCategories", fields: [walletId], references: [id])
   paymentReminders PaymentReminder[]
+  transactions     Transaction[]
 
   @@unique([name, type, walletId])
 }
 
 model Transaction {
-  id           String             @id @default(uuid())
-  walletId     String
-  categoryId   String?
-  type         TransactionType
-  amount       Decimal            @db.Decimal(14, 2)
-  date         DateTime           @default(now())
-  description  String?
-  paidByUserId String
-  createdById  String
-  createdAt    DateTime           @default(now())
-  category     Category?          @relation(fields: [categoryId], references: [id])
-  createdBy    User               @relation("TransactionsCreatedBy", fields: [createdById], references: [id])
-  paidBy       User               @relation("PaidBy", fields: [paidByUserId], references: [id])
-  wallet       Wallet             @relation(fields: [walletId], references: [id], onDelete: Cascade)
-  splits       TransactionSplit[]
+  id              String             @id @default(uuid())
+  walletId        String
+  categoryId      String?
+  type            TransactionType
+  amount          Decimal            @db.Decimal(14, 2)
+  date            DateTime           @default(now())
+  description     String?
+  paidByUserId    String
+  createdById     String
+  createdAt       DateTime           @default(now())
   paymentReminder PaymentReminder?
+  category        Category?          @relation(fields: [categoryId], references: [id])
+  createdBy       User               @relation("TransactionsCreatedBy", fields: [createdById], references: [id])
+  paidBy          User               @relation("PaidBy", fields: [paidByUserId], references: [id])
+  wallet          Wallet             @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  splits          TransactionSplit[]
 }
 
 model TransactionSplit {
@@ -169,6 +168,7 @@ model Goal {
   userId        String?
   walletId      String?
   name          String
+  description   String?
   targetAmount  Decimal        @db.Decimal(14, 2)
   currentAmount Decimal        @default(0) @db.Decimal(14, 2)
   deadline      DateTime?
@@ -206,24 +206,24 @@ model Invitation {
 }
 
 model PaymentReminder {
-  id            String      @id @default(uuid())
+  id            String       @id @default(uuid())
   userId        String
   walletId      String
-  categoryId    String       // Categoría de gasto obligatoria
   name          String
-  amount        Decimal     @db.Decimal(14, 2)
+  amount        Decimal      @db.Decimal(14, 2)
   description   String?
   dueDate       DateTime
-  reminderDate  DateTime?   // Cuándo notificar (opcional)
-  isPaid        Boolean     @default(false)
+  reminderDate  DateTime?
+  isPaid        Boolean      @default(false)
   paidAt        DateTime?
-  transactionId String?      @unique // Si se creó una transacción
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  wallet        Wallet      @relation(fields: [walletId], references: [id], onDelete: Cascade)
-  category      Category    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  transaction   Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+  transactionId String?      @unique
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  categoryId    String
+  category      Category     @relation(fields: [categoryId], references: [id])
+  transaction   Transaction? @relation(fields: [transactionId], references: [id])
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallet        Wallet       @relation(fields: [walletId], references: [id], onDelete: Cascade)
 }
 
 enum WalletType {
