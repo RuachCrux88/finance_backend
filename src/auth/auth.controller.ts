@@ -30,13 +30,14 @@ export class AuthController {
       const token = await this.auth.loginGoogle(req.user as any);
 
       // Seteamos cookie httpOnly con el JWT
+      const isProduction = process.env.NODE_ENV === 'production';
       res.cookie('token', token, {
         httpOnly: true,
-        sameSite: 'lax',
-        secure: process.env.NODE_ENV === 'production', // true en producción con HTTPS
+        sameSite: isProduction ? 'none' : 'lax', // 'none' es necesario para cross-origin en producción
+        secure: isProduction, // true en producción con HTTPS (requerido para sameSite: 'none')
         path: '/',
         maxAge: 1000 * 60 * 60 * 24 * 7, // 7 días
-        domain: process.env.NODE_ENV === 'production' ? undefined : undefined, // Dejar que el navegador maneje el dominio
+        // No especificar domain para que funcione cross-origin
       });
 
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
@@ -63,7 +64,12 @@ export class AuthController {
 
   @Post('logout')
   logout(@Res({ passthrough: true }) res: Response) {
-    res.clearCookie('token', { path: '/' });
+    const isProduction = process.env.NODE_ENV === 'production';
+    res.clearCookie('token', { 
+      path: '/',
+      sameSite: isProduction ? 'none' : 'lax',
+      secure: isProduction
+    });
     return { ok: true };
   }
 }
