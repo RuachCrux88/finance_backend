@@ -1,4 +1,3 @@
-// src/auth/auth.controller.ts
 import { Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
@@ -42,12 +41,14 @@ export class AuthController {
 
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
       res.redirect(frontendUrl);
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Redirigir al frontend con un error
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-      const errorMessage = encodeURIComponent(
-        error.message || 'Authentication failed',
-      );
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : 'Authentication failed';
+      const errorMessage = encodeURIComponent(message);
       res.redirect(`${frontendUrl}/login?error=${errorMessage}`);
     }
   }
