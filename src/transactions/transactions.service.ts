@@ -1,9 +1,10 @@
-import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
+import { CreateTransferDto } from './dto/create-transfer.dto';
 import { GoalsService } from '../goals/goals.service';
 
 @Injectable()
@@ -84,20 +85,9 @@ export class TransactionsService {
         },
       });
 
-      // Si es un aporte en billetera grupal (INCOME), actualizar el progreso de las metas activas
-      if (wallet.type === 'GROUP' && dto.type === 'INCOME') {
-        const activeGoals = await this.prisma.goal.findMany({
-          where: {
-            walletId: dto.walletId,
-            status: 'ACTIVE',
-          },
-        });
-
-        // Actualizar cada meta activa con el monto del aporte y registrar quién contribuyó
-        for (const goal of activeGoals) {
-          await this.goalsService.updateProgress(goal.id, Number(dto.amount), userId, dto.description);
-        }
-      }
+      // NO actualizar automáticamente metas cuando se crea INCOME en billetera grupal
+      // Las metas solo se actualizan cuando el usuario explícitamente hace un aporte a una meta específica
+      // (usando EXPENSE con descripción "Aporte a meta: [nombre]")
 
       // Si es un gasto (EXPENSE) que contiene "Aporte a meta" en la descripción, actualizar metas
       // Esto permite que los aportes se hagan en billeteras grupales y actualicen metas grupales
@@ -125,36 +115,50 @@ export class TransactionsService {
               console.warn(`Meta "${goalName}" no encontrada en la billetera ${dto.walletId}`);
             }
           } else {
-            // Si es en billetera personal, buscar en todas las billeteras grupales del usuario
-            const userWallets = await this.prisma.wallet.findMany({
+            // Si es en billetera personal, buscar primero en metas personales del usuario
+            const personalGoal = await this.prisma.goal.findFirst({
               where: {
-                OR: [
-                  { createdById: userId },
-                  { members: { some: { userId } } },
-                ],
-                type: 'GROUP',
-              },
-              include: {
-                goals: {
-                  where: {
-                    status: { in: ['ACTIVE', 'PAUSED'] },
-                  },
-                },
+                userId: userId,
+                scope: 'USER',
+                name: goalName,
+                status: { in: ['ACTIVE', 'PAUSED'] },
               },
             });
 
-            let goalFound = false;
-            for (const groupWallet of userWallets) {
-              const goal = groupWallet.goals.find(g => g.name === goalName);
-              if (goal) {
-                await this.goalsService.updateProgress(goal.id, Number(dto.amount), userId, dto.description);
-                goalFound = true;
-                break;
+            if (personalGoal) {
+              await this.goalsService.updateProgress(personalGoal.id, Number(dto.amount), userId, dto.description);
+            } else {
+              // Si no se encuentra en metas personales, buscar en todas las billeteras grupales del usuario
+              const userWallets = await this.prisma.wallet.findMany({
+                where: {
+                  OR: [
+                    { createdById: userId },
+                    { members: { some: { userId } } },
+                  ],
+                  type: 'GROUP',
+                },
+                include: {
+                  goals: {
+                    where: {
+                      status: { in: ['ACTIVE', 'PAUSED'] },
+                    },
+                  },
+                },
+              });
+
+              let goalFound = false;
+              for (const groupWallet of userWallets) {
+                const goal = groupWallet.goals.find(g => g.name === goalName);
+                if (goal) {
+                  await this.goalsService.updateProgress(goal.id, Number(dto.amount), userId, dto.description);
+                  goalFound = true;
+                  break;
+                }
               }
-            }
-            
-            if (!goalFound) {
-              console.warn(`Meta "${goalName}" no encontrada para el usuario ${userId}`);
+              
+              if (!goalFound) {
+                console.warn(`Meta "${goalName}" no encontrada para el usuario ${userId}`);
+              }
             }
           }
         }
@@ -490,5 +494,291 @@ export class TransactionsService {
       orderBy: { date: 'desc' },
       take: limit,
     });
+  }
+
+  async getStreak(userId: string) {
+    // Obtener todas las transacciones del usuario en billeteras personales
+    const personalWallets = await this.prisma.wallet.findMany({
+      where: {
+        OR: [
+          { createdById: userId, type: 'PERSONAL' },
+          { members: { some: { userId, wallet: { type: 'PERSONAL' } } } },
+        ],
+      },
+      select: { id: true },
+    });
+
+    const walletIds = personalWallets.map(w => w.id);
+
+    if (walletIds.length === 0) {
+      return {
+        currentStreak: 0,
+        status: 'none',
+        longestStreak: 0,
+        longestStreakPeriod: null,
+        lastActivityDate: null,
+      };
+    }
+
+    // Obtener todas las transacciones personales agrupadas por fecha
+    const transactions = await this.prisma.transaction.findMany({
+      where: {
+        walletId: { in: walletIds },
+        createdById: userId, // Solo transacciones creadas por el usuario
+      },
+      select: {
+        date: true,
+      },
+      orderBy: {
+        date: 'desc',
+      },
+    });
+
+    // Obtener fechas únicas (solo fecha, sin hora)
+    const activityDates = new Set<string>();
+    transactions.forEach(tx => {
+      const dateStr = tx.date.toISOString().split('T')[0];
+      activityDates.add(dateStr);
+    });
+
+    const dates = Array.from(activityDates).sort().reverse(); // Más reciente primero
+
+    if (dates.length === 0) {
+      return {
+        currentStreak: 0,
+        status: 'none',
+        longestStreak: 0,
+        longestStreakPeriod: null,
+        lastActivityDate: null,
+      };
+    }
+
+    // Calcular racha actual
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStr = today.toISOString().split('T')[0];
+    
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    const twoDaysAgo = new Date(today);
+    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+    const twoDaysAgoStr = twoDaysAgo.toISOString().split('T')[0];
+
+    let currentStreak = 0;
+    let status: 'active' | 'danger' | 'lost' | 'none' = 'none';
+    const lastActivityDate = dates[0];
+
+    // Calcular racha desde la última fecha de actividad hacia atrás
+    if (dates.length > 0) {
+      const lastDate = new Date(dates[0]);
+      let checkDate = new Date(lastDate);
+      let checkDateStr = dates[0];
+      
+      // Contar días consecutivos desde la última actividad
+      while (dates.includes(checkDateStr)) {
+        currentStreak++;
+        checkDate.setDate(checkDate.getDate() - 1);
+        checkDateStr = checkDate.toISOString().split('T')[0];
+      }
+
+      // Determinar estado según cuántos días han pasado desde la última actividad
+      const daysSinceLastActivity = Math.floor((today.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (daysSinceLastActivity === 0) {
+        // Actividad hoy - racha activa
+        status = 'active';
+      } else if (daysSinceLastActivity === 1) {
+        // Actividad ayer pero no hoy - en peligro (mantener racha)
+        status = 'danger';
+      } else if (daysSinceLastActivity === 2) {
+        // Actividad hace 2 días pero no ayer ni hoy - en peligro (último día)
+        status = 'danger';
+      } else {
+        // Más de 2 días sin actividad - racha perdida
+        status = 'lost';
+        currentStreak = 0; // Racha perdida, empezar de nuevo
+      }
+    } else {
+      status = 'none';
+      currentStreak = 0;
+    }
+
+    // Calcular racha más larga histórica
+    let longestStreak = 0;
+    let longestStreakStart: string | null = null;
+    let longestStreakEnd: string | null = null;
+
+    if (dates.length > 0) {
+      // Ordenar fechas de más antigua a más reciente para calcular rachas históricas
+      const sortedDates = Array.from(activityDates).sort();
+      
+      let currentRun = 1;
+      let runStart = sortedDates[0];
+      let runEnd = sortedDates[0];
+
+      for (let i = 1; i < sortedDates.length; i++) {
+        const prevDate = new Date(sortedDates[i - 1]);
+        const currDate = new Date(sortedDates[i]);
+        const daysDiff = Math.floor((currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24));
+
+        if (daysDiff === 1) {
+          // Días consecutivos
+          currentRun++;
+          runEnd = sortedDates[i];
+        } else {
+          // Racha rota
+          if (currentRun > longestStreak) {
+            longestStreak = currentRun;
+            longestStreakStart = runStart;
+            longestStreakEnd = runEnd;
+          }
+          currentRun = 1;
+          runStart = sortedDates[i];
+          runEnd = sortedDates[i];
+        }
+      }
+
+      // Verificar la última racha
+      if (currentRun > longestStreak) {
+        longestStreak = currentRun;
+        longestStreakStart = runStart;
+        longestStreakEnd = runEnd;
+      }
+    }
+
+    return {
+      currentStreak,
+      status,
+      longestStreak,
+      longestStreakPeriod: longestStreakStart && longestStreakEnd
+        ? {
+            start: longestStreakStart,
+            end: longestStreakEnd,
+          }
+        : null,
+      lastActivityDate,
+    };
+  }
+
+  async transferToUser(senderUserId: string, dto: CreateTransferDto) {
+    // Buscar usuario receptor por código
+    const recipient = await this.prisma.user.findUnique({
+      where: { userCode: dto.recipientUserCode },
+    });
+
+    if (!recipient) {
+      throw new NotFoundException('Usuario receptor no encontrado');
+    }
+
+    if (recipient.id === senderUserId) {
+      throw new BadRequestException('No puedes transferir dinero a ti mismo');
+    }
+
+    // Obtener billeteras personales de ambos usuarios
+    const senderWallet = await this.prisma.wallet.findFirst({
+      where: {
+        createdById: senderUserId,
+        type: 'PERSONAL',
+        OR: [
+          { isDefault: true },
+          { type: 'PERSONAL' },
+        ],
+      },
+    });
+
+    const recipientWallet = await this.prisma.wallet.findFirst({
+      where: {
+        createdById: recipient.id,
+        type: 'PERSONAL',
+        OR: [
+          { isDefault: true },
+          { type: 'PERSONAL' },
+        ],
+      },
+    });
+
+    if (!senderWallet) {
+      throw new NotFoundException('No se encontró tu billetera personal');
+    }
+
+    if (!recipientWallet) {
+      throw new NotFoundException('El usuario receptor no tiene billetera personal');
+    }
+
+    // Calcular balance del remitente
+    const senderTransactions = await this.prisma.transaction.findMany({
+      where: {
+        walletId: senderWallet.id,
+        paidByUserId: senderUserId,
+      },
+    });
+
+    let senderBalance = 0;
+    senderTransactions.forEach(tx => {
+      if (tx.type === 'INCOME') {
+        senderBalance += Number(tx.amount);
+      } else if (tx.type === 'EXPENSE') {
+        senderBalance -= Number(tx.amount);
+      }
+    });
+
+    if (senderBalance < dto.amount) {
+      throw new BadRequestException(`Saldo insuficiente. Tu saldo actual es ${senderBalance.toFixed(2)}`);
+    }
+
+    // Obtener información del remitente
+    const sender = await this.prisma.user.findUnique({
+      where: { id: senderUserId },
+      select: { name: true, email: true },
+    });
+
+    // Crear transacciones en una transacción de base de datos
+    const transferDescription = dto.description 
+      ? `Transferencia a ${recipient.name || recipient.email}: ${dto.description}`
+      : `Transferencia a ${recipient.name || recipient.email}`;
+
+    const receiveDescription = dto.description
+      ? `Transferencia de ${sender?.name || sender?.email || 'Usuario'}: ${dto.description}`
+      : `Transferencia de ${sender?.name || sender?.email || 'Usuario'}`;
+
+    // Crear ambas transacciones en una transacción atómica
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Transacción EXPENSE para el remitente
+      const senderTransaction = await tx.transaction.create({
+        data: {
+          wallet: { connect: { id: senderWallet.id } },
+          type: 'EXPENSE',
+          amount: new Decimal(dto.amount),
+          description: transferDescription,
+          paidBy: { connect: { id: senderUserId } },
+          createdBy: { connect: { id: senderUserId } },
+        },
+      });
+
+      // Transacción INCOME para el receptor
+      const recipientTransaction = await tx.transaction.create({
+        data: {
+          wallet: { connect: { id: recipientWallet.id } },
+          type: 'INCOME',
+          amount: new Decimal(dto.amount),
+          description: receiveDescription,
+          paidBy: { connect: { id: recipient.id } },
+          createdBy: { connect: { id: senderUserId } },
+        },
+      });
+
+      return {
+        senderTransaction,
+        recipientTransaction,
+      };
+    });
+
+    return {
+      success: true,
+      senderTransaction: result.senderTransaction,
+      recipientTransaction: result.recipientTransaction,
+    };
   }
 }

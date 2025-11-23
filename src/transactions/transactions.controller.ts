@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { TransactionsService } from './transactions.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
-import { CreateTransactionDto } from './dto';
+import { CreateTransactionDto, CreateTransferDto } from './dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('transactions')
@@ -56,5 +56,15 @@ export class TransactionsController {
     // Solo permitir limpieza manual por ahora
     // En producción, esto debería ser un cron job
     return this.svc.cleanupOldTransactions();
+  }
+
+  @Get('streak')
+  getStreak(@Req() req: any) {
+    return this.svc.getStreak(req.user.id);
+  }
+
+  @Post('transfer')
+  transfer(@Req() req: any, @Body() body: CreateTransferDto) {
+    return this.svc.transferToUser(req.user.id, body);
   }
 }

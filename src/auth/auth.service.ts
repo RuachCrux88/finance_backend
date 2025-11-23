@@ -4,6 +4,16 @@ import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { randomBytes } from 'crypto';
 
+// Función para generar código único de 10 caracteres alfanuméricos
+function generateUserCode(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let code = '';
+  for (let i = 0; i < 10; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
 interface GoogleUser {
   email: string;
   name?: string;
@@ -66,10 +76,27 @@ export class AuthService {
           }
         }
 
+        // Generar código único de usuario
+        let userCode = generateUserCode();
+        let codeExists = true;
+        
+        // Asegurar que el código sea único
+        while (codeExists) {
+          const existing = await this.prisma.user.findUnique({
+            where: { userCode },
+          });
+          if (!existing) {
+            codeExists = false;
+          } else {
+            userCode = generateUserCode();
+          }
+        }
+
         user = await this.prisma.user.create({
           data: {
             email: userFromStrategy.email,
             name: userFromStrategy.name ?? '',
+            userCode,
             emailVerifiedAt: new Date(), // Google ya verificó el email
             // Crear la cuenta de Google OAuth
             accounts: {
@@ -168,12 +195,55 @@ export class AuthService {
   }
 
   async getUserById(userId: string) {
-    const user = await this.prisma.user.findUnique({
+    let user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
         id: true,
         email: true,
         name: true,
+        userCode: true,
+      },
+    });
+
+    // Si el usuario no tiene código, generarlo
+    if (user && (!user.userCode || user.userCode === '')) {
+      let userCode = generateUserCode();
+      let codeExists = true;
+      
+      while (codeExists) {
+        const existing = await this.prisma.user.findUnique({
+          where: { userCode },
+        });
+        if (!existing) {
+          codeExists = false;
+        } else {
+          userCode = generateUserCode();
+        }
+      }
+      
+      user = await this.prisma.user.update({
+        where: { id: userId },
+        data: { userCode },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          userCode: true,
+        },
+      });
+    }
+
+    return user;
+  }
+
+  async getUserByCode(userCode: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { userCode },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        userCode: true,
       },
     });
     return user;

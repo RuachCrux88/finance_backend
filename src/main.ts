@@ -20,8 +20,23 @@ async function createNestApp() {
   const app = await NestFactory.create(AppModule);
 
   app.use(cookieParser());
+  
+  // Permitir múltiples orígenes para CORS
+  const allowedOrigins = [
+    process.env.FRONTEND_URL,
+    'http://localhost:3000',
+    'http://localhost:5173',
+  ].filter(Boolean); // Elimina valores undefined/null
+
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: (origin, callback) => {
+      // Permitir requests sin origin (mobile apps, Postman, redirects de OAuth)
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
   });
 

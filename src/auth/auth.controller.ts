@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Req, Res, UseGuards, BadRequestException, Param } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
@@ -58,9 +58,19 @@ export class AuthController {
   async me(@Req() req: Request) {
     // payload validado por JwtStrategy
     const userInfo = req.user as { id: string; email: string };
-    // Obtenemos el usuario completo de la base de datos para incluir el nombre
+    // Obtenemos el usuario completo de la base de datos para incluir el nombre y código
     const fullUser = await this.auth.getUserById(userInfo.id);
     return fullUser || userInfo;
+  }
+
+  @Get('user/:userCode')
+  @UseGuards(AuthGuard('jwt'))
+  async getUserByCode(@Param('userCode') userCode: string) {
+    const user = await this.auth.getUserByCode(userCode);
+    if (!user) {
+      throw new BadRequestException('Usuario no encontrado');
+    }
+    return user;
   }
 
   @Post('logout')
