@@ -1,10 +1,553 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>$Title$</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diagrama UML - Estructura del Proyecto Finance Backend</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+      body {
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          margin: 0;
+          padding: 20px;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          min-height: 100vh;
+      }
+      .container {
+          max-width: 1400px;
+          margin: 0 auto;
+          background: white;
+          border-radius: 10px;
+          padding: 30px;
+          box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+      }
+      h1 {
+          color: #333;
+          text-align: center;
+          margin-bottom: 10px;
+      }
+      h2 {
+          color: #667eea;
+          border-bottom: 2px solid #667eea;
+          padding-bottom: 10px;
+          margin-top: 40px;
+      }
+      .diagram-container {
+          background: #f8f9fa;
+          border-radius: 8px;
+          padding: 20px;
+          margin: 20px 0;
+          overflow-x: auto;
+      }
+      .mermaid {
+          text-align: center;
+      }
+      .info-box {
+          background: #e3f2fd;
+          border-left: 4px solid #2196f3;
+          padding: 15px;
+          margin: 20px 0;
+          border-radius: 4px;
+      }
+      .legend {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 15px;
+          margin: 20px 0;
+          padding: 15px;
+          background: #f5f5f5;
+          border-radius: 8px;
+      }
+      .legend-item {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+      }
+      .legend-color {
+          width: 20px;
+          height: 20px;
+          border-radius: 4px;
+      }
+  </style>
 </head>
 <body>
-$END$
+<div class="container">
+  <h1>📊 Diagrama UML - Finance Backend</h1>
+  <p style="text-align: center; color: #666;">Estructura de Módulos, Servicios y Controladores</p>
+
+  <div class="info-box">
+    <strong>Información:</strong> Este diagrama muestra la arquitectura completa del backend de la aplicación Finance,
+    incluyendo módulos de NestJS, servicios, controladores y sus dependencias.
+  </div>
+
+  <div class="legend">
+    <div class="legend-item">
+      <div class="legend-color" style="background: #4CAF50;"></div>
+      <span>Módulo</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-color" style="background: #2196F3;"></div>
+      <span>Servicio</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-color" style="background: #FF9800;"></div>
+      <span>Controlador</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-color" style="background: #9C27B0;"></div>
+      <span>Infraestructura</span>
+    </div>
+  </div>
+
+  <h2>1. Diagrama de Componentes - Arquitectura de Módulos</h2>
+  <div class="diagram-container">
+    <div class="mermaid">
+      graph TB
+      AppModule[AppModule<br/>Módulo Principal]
+
+      PrismaModule[PrismaModule<br/>🔧 Global<br/>Acceso a BD]
+      AuthModule[AuthModule<br/>🔐 Autenticación]
+      UsersModule[UsersModule<br/>👤 Usuarios]
+      WalletsModule[WalletsModule<br/>💼 Billeteras]
+      TransactionsModule[TransactionsModule<br/>💰 Transacciones]
+      CategoriesModule[CategoriesModule<br/>📁 Categorías]
+      GoalsModule[GoalsModule<br/>🎯 Metas]
+      InvitationsModule[InvitationsModule<br/>✉️ Invitaciones]
+      RemindersModule[RemindersModule<br/>⏰ Recordatorios]
+
+      AppModule --> PrismaModule
+      AppModule --> AuthModule
+      AppModule --> UsersModule
+      AppModule --> WalletsModule
+      AppModule --> TransactionsModule
+      AppModule --> CategoriesModule
+      AppModule --> GoalsModule
+      AppModule --> InvitationsModule
+      AppModule --> RemindersModule
+
+      AuthModule --> PrismaModule
+      UsersModule --> PrismaModule
+      WalletsModule --> PrismaModule
+      TransactionsModule --> PrismaModule
+      TransactionsModule --> GoalsModule
+      CategoriesModule --> PrismaModule
+      GoalsModule --> PrismaModule
+      InvitationsModule --> PrismaModule
+      RemindersModule --> PrismaModule
+      RemindersModule --> TransactionsModule
+
+      style AppModule fill:#4CAF50,stroke:#2E7D32,stroke-width:3px,color:#fff
+      style PrismaModule fill:#9C27B0,stroke:#6A1B9A,stroke-width:3px,color:#fff
+      style AuthModule fill:#2196F3,stroke:#1565C0,stroke-width:2px,color:#fff
+      style UsersModule fill:#2196F3,stroke:#1565C0,stroke-width:2px,color:#fff
+      style WalletsModule fill:#2196F3,stroke:#1565C0,stroke-width:2px,color:#fff
+      style TransactionsModule fill:#2196F3,stroke:#1565C0,stroke-width:2px,color:#fff
+      style CategoriesModule fill:#2196F3,stroke:#1565C0,stroke-width:2px,color:#fff
+      style GoalsModule fill:#2196F3,stroke:#1565C0,stroke-width:2px,color:#fff
+      style InvitationsModule fill:#2196F3,stroke:#1565C0,stroke-width:2px,color:#fff
+      style RemindersModule fill:#2196F3,stroke:#1565C0,stroke-width:2px,color:#fff
+    </div>
+  </div>
+
+  <h2>2. Diagrama de Clases - Servicios y Controladores</h2>
+  <div class="diagram-container">
+    <div class="mermaid">
+      classDiagram
+      class AppModule {
+      +imports[]
+      +controllers[]
+      }
+
+      class PrismaModule {
+      <<Global>>
+      +PrismaService
+      }
+
+      class AuthModule {
+      +AuthService
+      +AuthController
+      +GoogleStrategy
+      +JwtStrategy
+      }
+
+      class UsersModule {
+      +UsersService
+      +UsersController
+      }
+
+      class WalletsModule {
+      +WalletsService
+      +WalletsController
+      }
+
+      class TransactionsModule {
+      +TransactionsService
+      +TransactionsController
+      }
+
+      class CategoriesModule {
+      +CategoriesService
+      +CategoriesController
+      }
+
+      class GoalsModule {
+      +GoalsService
+      +GoalsController
+      }
+
+      class InvitationsModule {
+      +InvitationsService
+      +InvitationsController
+      }
+
+      class RemindersModule {
+      +RemindersService
+      +RemindersController
+      }
+
+      class PrismaService {
+      +onModuleInit()
+      +enableShutdownHooks()
+      }
+
+      class AuthService {
+      +loginGoogle()
+      +getUserById()
+      }
+
+      class UsersService {
+      +findAll()
+      +delete()
+      }
+
+      class WalletsService {
+      +create()
+      +listMine()
+      +joinByCode()
+      +computeBalances()
+      +suggestSettlements()
+      +createSettlement()
+      }
+
+      class TransactionsService {
+      +create()
+      +listByWallet()
+      +update()
+      +getDailyExpenses()
+      +getHistory()
+      }
+
+      class CategoriesService {
+      +list()
+      +create()
+      +update()
+      +remove()
+      +cleanupDuplicates()
+      }
+
+      class GoalsService {
+      +create()
+      +findByWallet()
+      +findByUser()
+      +updateProgress()
+      +markAsAchieved()
+      }
+
+      class InvitationsService {
+      +createInvitation()
+      +acceptInvitation()
+      +getPendingInvitations()
+      }
+
+      class RemindersService {
+      +create()
+      +findAll()
+      +markAsPaid()
+      +update()
+      +remove()
+      }
+
+      class MailerService {
+      +sendVerificationEmail()
+      +sendInvitationEmail()
+      }
+
+      AppModule --> PrismaModule
+      AppModule --> AuthModule
+      AppModule --> UsersModule
+      AppModule --> WalletsModule
+      AppModule --> TransactionsModule
+      AppModule --> CategoriesModule
+      AppModule --> GoalsModule
+      AppModule --> InvitationsModule
+      AppModule --> RemindersModule
+
+      AuthModule --> PrismaService
+      UsersModule --> PrismaService
+      WalletsModule --> PrismaService
+      TransactionsModule --> PrismaService
+      TransactionsModule --> GoalsService
+      CategoriesModule --> PrismaService
+      GoalsModule --> PrismaService
+      InvitationsModule --> PrismaService
+      InvitationsModule --> MailerService
+      RemindersModule --> PrismaService
+      RemindersModule --> TransactionsService
+
+      AuthService --> PrismaService
+      UsersService --> PrismaService
+      WalletsService --> PrismaService
+      TransactionsService --> PrismaService
+      TransactionsService --> GoalsService
+      CategoriesService --> PrismaService
+      GoalsService --> PrismaService
+      InvitationsService --> PrismaService
+      InvitationsService --> MailerService
+      RemindersService --> PrismaService
+      RemindersService --> TransactionsService
+    </div>
+  </div>
+
+  <h2>3. Diagrama de Dependencias Detallado</h2>
+  <div class="diagram-container">
+    <div class="mermaid">
+      graph LR
+      subgraph "Módulo Principal"
+      AppModule[AppModule]
+      AppController[AppController<br/>GET /health]
+      end
+
+      subgraph "Infraestructura"
+      PrismaService[PrismaService<br/>🔧 Acceso a BD]
+      MailerService[MailerService<br/>📧 Envío de Emails]
+      end
+
+      subgraph "Autenticación"
+      AuthService[AuthService<br/>• loginGoogle<br/>• getUserById]
+      AuthController[AuthController<br/>POST /auth/google<br/>GET /auth/me]
+      GoogleStrategy[GoogleStrategy]
+      JwtStrategy[JwtStrategy]
+      end
+
+      subgraph "Usuarios"
+      UsersService[UsersService<br/>• findAll<br/>• delete]
+      UsersController[UsersController<br/>GET /users<br/>DELETE /users/:id]
+      end
+
+      subgraph "Billeteras"
+      WalletsService[WalletsService<br/>• create<br/>• listMine<br/>• computeBalances<br/>• suggestSettlements]
+      WalletsController[WalletsController<br/>POST /wallets<br/>GET /wallets<br/>POST /wallets/join]
+      end
+
+      subgraph "Transacciones"
+      TransactionsService[TransactionsService<br/>• create<br/>• listByWallet<br/>• getDailyExpenses<br/>• getHistory]
+      TransactionsController[TransactionsController<br/>POST /transactions<br/>GET /transactions]
+      end
+
+      subgraph "Categorías"
+      CategoriesService[CategoriesService<br/>• list<br/>• create<br/>• update<br/>• remove]
+      CategoriesController[CategoriesController<br/>GET /categories<br/>POST /categories]
+      end
+
+      subgraph "Metas"
+      GoalsService[GoalsService<br/>• create<br/>• updateProgress<br/>• markAsAchieved]
+      GoalsController[GoalsController<br/>POST /goals<br/>GET /goals]
+      end
+
+      subgraph "Invitaciones"
+      InvitationsService[InvitationsService<br/>• createInvitation<br/>• acceptInvitation]
+      InvitationsController[InvitationsController<br/>POST /invitations<br/>POST /invitations/accept]
+      end
+
+      subgraph "Recordatorios"
+      RemindersService[RemindersService<br/>• create<br/>• markAsPaid<br/>• update]
+      RemindersController[RemindersController<br/>POST /reminders<br/>GET /reminders]
+      end
+
+      AppModule --> AppController
+      AuthModule --> AuthService
+      AuthModule --> AuthController
+      AuthModule --> GoogleStrategy
+      AuthModule --> JwtStrategy
+      UsersModule --> UsersService
+      UsersModule --> UsersController
+      WalletsModule --> WalletsService
+      WalletsModule --> WalletsController
+      TransactionsModule --> TransactionsService
+      TransactionsModule --> TransactionsController
+      CategoriesModule --> CategoriesService
+      CategoriesModule --> CategoriesController
+      GoalsModule --> GoalsService
+      GoalsModule --> GoalsController
+      InvitationsModule --> InvitationsService
+      InvitationsModule --> InvitationsController
+      RemindersModule --> RemindersService
+      RemindersModule --> RemindersController
+
+      AuthService --> PrismaService
+      UsersService --> PrismaService
+      WalletsService --> PrismaService
+      TransactionsService --> PrismaService
+      TransactionsService --> GoalsService
+      CategoriesService --> PrismaService
+      GoalsService --> PrismaService
+      InvitationsService --> PrismaService
+      InvitationsService --> MailerService
+      RemindersService --> PrismaService
+      RemindersService --> TransactionsService
+
+      style PrismaService fill:#9C27B0,stroke:#6A1B9A,stroke-width:3px,color:#fff
+      style MailerService fill:#9C27B0,stroke:#6A1B9A,stroke-width:3px,color:#fff
+      style AuthService fill:#4CAF50,stroke:#2E7D32,stroke-width:2px,color:#fff
+      style UsersService fill:#4CAF50,stroke:#2E7D32,stroke-width:2px,color:#fff
+      style WalletsService fill:#4CAF50,stroke:#2E7D32,stroke-width:2px,color:#fff
+      style TransactionsService fill:#4CAF50,stroke:#2E7D32,stroke-width:2px,color:#fff
+      style CategoriesService fill:#4CAF50,stroke:#2E7D32,stroke-width:2px,color:#fff
+      style GoalsService fill:#4CAF50,stroke:#2E7D32,stroke-width:2px,color:#fff
+      style InvitationsService fill:#4CAF50,stroke:#2E7D32,stroke-width:2px,color:#fff
+      style RemindersService fill:#4CAF50,stroke:#2E7D32,stroke-width:2px,color:#fff
+      style AuthController fill:#FF9800,stroke:#E65100,stroke-width:2px,color:#fff
+      style UsersController fill:#FF9800,stroke:#E65100,stroke-width:2px,color:#fff
+      style WalletsController fill:#FF9800,stroke:#E65100,stroke-width:2px,color:#fff
+      style TransactionsController fill:#FF9800,stroke:#E65100,stroke-width:2px,color:#fff
+      style CategoriesController fill:#FF9800,stroke:#E65100,stroke-width:2px,color:#fff
+      style GoalsController fill:#FF9800,stroke:#E65100,stroke-width:2px,color:#fff
+      style InvitationsController fill:#FF9800,stroke:#E65100,stroke-width:2px,color:#fff
+      style RemindersController fill:#FF9800,stroke:#E65100,stroke-width:2px,color:#fff
+    </div>
+  </div>
+
+  <h2>4. Diagrama de Flujo de Datos - Relaciones entre Servicios</h2>
+  <div class="diagram-container">
+    <div class="mermaid">
+      flowchart TD
+      Start([Cliente HTTP]) --> AuthController
+      AuthController --> AuthService
+      AuthService --> PrismaService
+      AuthService -->|Crea Usuario| WalletsService
+      WalletsService -->|Crea Billetera| PrismaService
+
+      Start --> UsersController
+      UsersController --> UsersService
+      UsersService --> PrismaService
+
+      Start --> WalletsController
+      WalletsController --> WalletsService
+      WalletsService --> PrismaService
+      WalletsService -->|Calcula Balances| ComputeBalances[computeBalances]
+      WalletsService -->|Sugiere Liquidaciones| SuggestSettlements[suggestSettlements]
+
+      Start --> TransactionsController
+      TransactionsController --> TransactionsService
+      TransactionsService --> PrismaService
+      TransactionsService -->|Actualiza Progreso| GoalsService
+      GoalsService --> PrismaService
+
+      Start --> CategoriesController
+      CategoriesController --> CategoriesService
+      CategoriesService --> PrismaService
+
+      Start --> GoalsController
+      GoalsController --> GoalsService
+      GoalsService --> PrismaService
+
+      Start --> InvitationsController
+      InvitationsController --> InvitationsService
+      InvitationsService --> PrismaService
+      InvitationsService -->|Envía Email| MailerService
+
+      Start --> RemindersController
+      RemindersController --> RemindersService
+      RemindersService --> PrismaService
+      RemindersService -->|Crea Transacción| TransactionsService
+
+      PrismaService --> Database[(PostgreSQL<br/>Database)]
+
+      style Start fill:#2196F3,stroke:#1565C0,stroke-width:2px,color:#fff
+      style PrismaService fill:#9C27B0,stroke:#6A1B9A,stroke-width:3px,color:#fff
+      style Database fill:#4CAF50,stroke:#2E7D32,stroke-width:3px,color:#fff
+      style AuthService fill:#FF9800,stroke:#E65100,stroke-width:2px,color:#fff
+      style WalletsService fill:#FF9800,stroke:#E65100,stroke-width:2px,color:#fff
+      style TransactionsService fill:#FF9800,stroke:#E65100,stroke-width:2px,color:#fff
+      style GoalsService fill:#FF9800,stroke:#E65100,stroke-width:2px,color:#fff
+      style MailerService fill:#00BCD4,stroke:#00838F,stroke-width:2px,color:#fff
+    </div>
+  </div>
+
+  <h2>5. Resumen de Servicios y Lógica de Negocio</h2>
+  <div class="diagram-container">
+    <div class="mermaid">
+      mindmap
+      root((Finance Backend))
+      Servicios con Lógica de Negocio
+      AuthService
+      Autenticación Google OAuth
+      Creación automática de billetera
+      Generación de JWT
+      WalletsService
+      Cálculo de balances
+      Sugerencias de liquidaciones
+      Gestión de miembros
+      Creación de categorías por defecto
+      TransactionsService
+      Reglas de billeteras grupales
+      Actualización de metas
+      Agrupación de gastos/ingresos
+      Cálculo de balances personales
+      GoalsService
+      Cálculo de progreso
+      Gestión de estados
+      Validación de permisos
+      CategoriesService
+      Merge de categorías
+      Validación de permisos
+      Limpieza de duplicados
+      RemindersService
+      Validación de fechas
+      Creación automática de transacciones
+      Renovación mensual
+      InvitationsService
+      Generación de tokens
+      Validación de expiración
+      Envío de emails
+      UsersService
+      Eliminación en cascada
+      Transferencia de propiedad
+      Servicios de Infraestructura
+      PrismaService
+      Acceso a base de datos
+      MailerService
+      Envío de emails
+      AppService
+      Servicio básico
+    </div>
+  </div>
+
+  <div class="info-box" style="margin-top: 40px;">
+    <strong>Notas:</strong>
+    <ul>
+      <li><strong>PrismaModule</strong> es un módulo Global, disponible en todos los módulos sin necesidad de importarlo explícitamente.</li>
+      <li><strong>TransactionsModule</strong> exporta TransactionsService para que RemindersModule pueda usarlo.</li>
+      <li><strong>GoalsModule</strong> exporta GoalsService para que TransactionsModule pueda actualizar el progreso de las metas.</li>
+      <li><strong>CategoriesModule</strong> exporta CategoriesService (aunque actualmente no se usa en otros módulos).</li>
+      <li>Todos los servicios con lógica de negocio dependen de <strong>PrismaService</strong> para acceder a la base de datos.</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'default',
+    themeVariables: {
+      primaryColor: '#667eea',
+      primaryTextColor: '#fff',
+      primaryBorderColor: '#764ba2',
+      lineColor: '#667eea',
+      secondaryColor: '#f8f9fa',
+      tertiaryColor: '#e3f2fd'
+    }
+  });
+</script>
 </body>
 </html>
