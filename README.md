@@ -387,8 +387,7 @@ npm run test:cov
 ## 🤝 Contribuidores
 
 - [@RuachCrux88](https://github.com/RuachCrux88) - Katherine Rodríguez Mejía
-- [@diegolt8](https://github.com/diegolt8)
-- [@SebasFj](https://github.com/SebasFj) - Sebastián Flórez Jaramillo
+- [@MiguelvVargass](https://github.com/MiguelvVargass) - Miguel Vargas 
 
 ## 📝 Licencia
 
